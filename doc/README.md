@@ -236,27 +236,6 @@ Follow this commit message format:
 | `chore` | Build, config, or tooling changes |
 | `perf` | Performance improvement |
 
-### Scopes
-
-| Scope | Description |
-|-------|-------------|
-| `common` | Common utilities (config, schema, data_value) |
-| `generator` | Data generators (fixed, schema_guided, property_guided) |
-| `publisher` | Publishers (iceoryx, zenoh) |
-| `serializer` | Serializers (json, protobuf, flatbuffers) |
-| `rybench` | Main application |
-| `config` | Configuration files |
-| `doc` | Documentation |
-
-### Examples
-
-```
-feat(serializer): add msgpack serializer support
-fix(generator): correct array size constraint handling
-refactor(publisher): extract common initialization logic
-docs(readme): add commit convention section
-chore(cmake): update protobuf dependency version
-```
 
 ---
 
