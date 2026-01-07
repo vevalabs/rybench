@@ -1,5 +1,5 @@
-#include "common/signal_handler.hpp"
-#include "publisher/iceoryx_publisher.hpp"
+#include "signal_handler.hpp"
+#include "iceoryx_publisher.hpp"
 #include "iceoryx_posh/popo/untyped_subscriber.hpp"
 #include "iceoryx_posh/mepoo/chunk_header.hpp"
 

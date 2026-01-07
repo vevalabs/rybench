@@ -214,6 +214,31 @@ enabled = false
 output = dump/benchmark.jsonl
 ```
 
+## Commit Convention
+
+Follow this commit message format:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+```
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `refactor` | Code refactoring (no feature change) |
+| `docs` | Documentation only |
+| `test` | Adding or updating tests |
+| `chore` | Build, config, or tooling changes |
+| `perf` | Performance improvement |
+
+
+---
+
 ## Dependencies
 
 - GCC with C++17 support
