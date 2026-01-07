@@ -1,4 +1,4 @@
-#include "serializer/flatbuffers_serializer.hpp"
+#include "flatbuffers_serializer.hpp"
 #include "osi_sensorview_generated.h"
 
 namespace {

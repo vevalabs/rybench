@@ -21,12 +21,15 @@ foreach(FBS_FILE ${FBS_FILES})
 endforeach()
 
 add_library(common STATIC
+    config.cpp
+    schema.cpp
+    recorder.cpp
     ${PROTO_SRCS}
     ${FBS_HDRS}
 )
 
 target_include_directories(common PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_BINARY_DIR}
     ${Protobuf_INCLUDE_DIRS}
 )

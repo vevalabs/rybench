@@ -1,4 +1,4 @@
-#include "serializer/protobuf_serializer.hpp"
+#include "protobuf_serializer.hpp"
 #include "osi_sensorview.pb.h"
 
 // Register OSI protobuf messages at static initialization
