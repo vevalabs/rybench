@@ -1,0 +1,30 @@
+# Field ranges for osi_sensorview.proto
+# Format: field_path = min, max
+# For nested fields use dot notation: message.field.subfield
+
+[Timestamp]
+seconds = 0, 1000000
+nanos = 0, 999999999
+
+[Vector3d]
+x = -10.0, 10.0
+y = -10.0, 10.0
+z = -1.0, 1.0
+
+[BaseMoving.velocity]
+x = -50.0, 50.0
+y = -50.0, 50.0
+z = -10.0, 10.0
+
+[BaseMoving.orientation]
+x = -3.14159, 3.14159
+y = -3.14159, 3.14159
+z = -3.14159, 3.14159
+
+[MovingObject]
+id = 1, 10000
+
+[SensorViewMessage]
+sensor_id = 1, 100
+sensor_name.length = 5, 20
+moving_object.count = 1, 10

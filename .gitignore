@@ -1,0 +1,8 @@
+# IDE / Editor
+.vscode/
+
+# Build artifacts
+build/
+
+# Tool-specific files
+CLAUDE.md

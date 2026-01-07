@@ -1,0 +1,44 @@
+{
+    "name": "BenchmarkMessage",
+    "fields": [
+        {
+            "name": "timestamp",
+            "type": "int",
+            "min": 0,
+            "max": 9999999999
+        },
+        {
+            "name": "sequence",
+            "type": "int",
+            "min": 0,
+            "max": 1000000
+        },
+        {
+            "name": "value",
+            "type": "double",
+            "min": 0.0,
+            "max": 100.0
+        },
+        {
+            "name": "label",
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 20
+        },
+        {
+            "name": "active",
+            "type": "bool"
+        },
+        {
+            "name": "measurements",
+            "type": "array",
+            "arraySize": 5,
+            "items": {
+                "name": "measurement",
+                "type": "double",
+                "min": -100.0,
+                "max": 100.0
+            }
+        }
+    ]
+}
