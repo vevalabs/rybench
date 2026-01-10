@@ -6,3 +6,9 @@ build/
 
 # Tool-specific files
 CLAUDE.md
+
+# dump
+dump/*.jsonl
+
+# Editor backup / temp files
+~
