@@ -1,9 +1,10 @@
 #pragma once
 
 #include "generator.hpp"
+#include "reflection_builder.hpp"
 #include <fstream>
 #include <string>
-#include <nlohmann/json_fwd.hpp>
+#include <memory>
 
 namespace generator {
 
@@ -12,9 +13,9 @@ public:
     FixedGenerator() = default;
     ~FixedGenerator();
 
-    void loadSchema(const common::Schema& schema) override;
+    void loadSchema(const common::FlatBuffersSchema& schema) override;
     void loadDump(const std::string& filepath);
-    common::DataValue generate() override;
+    common::Message generate() override;
 
     void reset();
     bool finished() const;
@@ -23,16 +24,14 @@ public:
     std::string name() const override;
 
 private:
-    common::Schema schema_;
+    const common::FlatBuffersSchema* schema_ = nullptr;
     std::ifstream file_;
     bool finished_ = false;
     bool useSchemaData_ = false;
-    common::DataValue schemaData_;
+    std::unique_ptr<ReflectionBuilder> builder_;
+    std::mt19937_64 rng_;  // For fixed seed generation
 
-    common::DataValue buildFixedFromSchema();
-    common::DataValue buildFixedField(const common::SchemaField& field);
-    static common::DataValue jsonToDataValue(const nlohmann::json& j);
-    static nlohmann::json dataValueToJson(const common::DataValue& v);
+    common::Message buildFixedFromSchema();
 };
 
 } // namespace generator

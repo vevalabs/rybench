@@ -1,0 +1,23 @@
+namespace benchmark;
+
+// Custom attributes for constraints
+attribute "min";
+attribute "max";
+attribute "min_length";
+attribute "max_length";
+attribute "pattern";
+attribute "min_items";
+attribute "max_items";
+
+table Sensor {
+  id:uint (min: "1", max: "1000000");
+  temperature:float (min: "-40.0", max: "125.0");
+  label:string (min_length: "3", max_length: "12", pattern: "^[A-Z]+$");
+}
+
+table Packet {
+  timestamp:ulong;
+  sensors:[Sensor] (min_items: "1", max_items: "16");
+}
+
+root_type Packet;

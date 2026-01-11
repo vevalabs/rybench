@@ -1,13 +1,14 @@
-#include "generator_factory.hpp"
-#include "fixed_generator.hpp"
-#include "schema_guided_generator.hpp"
-#include "property_guided_generator.hpp"
+#include "include/generator_factory.hpp"
+#include "fixed/include/fixed_generator.hpp"
+#include "schema_guided/include/schema_guided_generator.hpp"
+#include "property_guided/include/property_guided_generator.hpp"
 
 #include <iostream>
 
 namespace generator {
 
-GeneratorPtr createGenerator(const common::Config& config, const common::Schema& schema) {
+GeneratorPtr createGenerator(const common::Config& config) {
+    const auto& schema = config.schema();
     std::string algorithm = config.get("generator", "algorithm", "schema_guided");
     uint64_t seed = config.getInt("generator", "seed", 0);
 

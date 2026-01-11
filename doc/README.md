@@ -63,36 +63,33 @@ Configure via `[serializer] type` in the INI file:
 
 - `fbs_message` - Message type to use (e.g., `osi::SensorViewMessage`)
 
-### Field Ranges Configuration
+### Schema Configuration
 
-When using protobuf or flatbuffers serializer, field value ranges are automatically loaded from a `.fields` config file.
+All serializers use FlatBuffers binary schema (.bfbs) for field constraints. Configure the schema path in the `[schema]` section:
 
-**Naming convention:** The `.fields` file is auto-derived from the proto message name:
-- `osi::SensorViewMessage` → `config/protos/osi_sensorview.fields` (removes "Message" suffix)
-- `osi::MovingObject` → `config/protos/osi_movingobject.fields`
-
-**Format:**
 ```ini
-# Field ranges for osi_sensorview.proto
-# Use [MessageType] sections and field = min, max
-
-[Timestamp]
-seconds = 0, 1000000
-nanos = 0, 999999999
-
-[Vector3d]
-x = -1000.0, 1000.0
-y = -1000.0, 1000.0
-z = -100.0, 100.0
-
-[MovingObject]
-id = 1, 10000
-
-[SensorViewMessage]
-sensor_id = 1, 100
-sensor_name.length = 5, 20       # string length
-moving_object.count = 1, 10      # repeated field count
+[schema]
+bfbs = config/flatbuffers/osi_sensorview.bfbs
 ```
+
+The constraints are defined as attributes in the `.fbs` source file and compiled to `.bfbs`:
+
+```flatbuffers
+attribute "min";
+attribute "max";
+attribute "min_length";
+attribute "max_length";
+attribute "min_items";
+attribute "max_items";
+
+table SensorViewMessage {
+    sensor_id: uint64 (min: "1", max: "100");
+    sensor_name: string (min_length: "5", max_length: "20");
+    moving_object: [MovingObject] (min_items: "1", max_items: "10");
+}
+```
+
+Compile the schema with: `flatc --binary --schema -o config/flatbuffers config/flatbuffers/osi_sensorview.fbs`
 
 ### Available Proto Messages
 
@@ -128,60 +125,44 @@ Configure via `[generator] algorithm` in the INI file:
 
 ## Schema Format
 
-Schemas are JSON files defining the message structure. Place in `config/schemas/`.
+Schemas are FlatBuffers files (.fbs) defining the message structure. Place in `config/flatbuffers/`.
 
-### Supported Field Types
+### Supported Constraint Attributes
 
-| Type | Aliases | Constraints |
-|------|---------|-------------|
-| `int` | `integer` | `min`, `max` |
-| `double` | `float`, `number` | `min`, `max` |
-| `string` | - | `minLength`, `maxLength` |
-| `bool` | `boolean` | - |
-| `array` | - | `arraySize`, `items` |
-| `object` | - | `fields` |
+| Attribute | Applies To | Description |
+|-----------|------------|-------------|
+| `min` | numeric types | Minimum value |
+| `max` | numeric types | Maximum value |
+| `min_length` | string | Minimum string length |
+| `max_length` | string | Maximum string length |
+| `min_items` | vector | Minimum array size |
+| `max_items` | vector | Maximum array size |
 
 ### Example Schema
 
-```json
-{
-    "name": "BenchmarkMessage",
-    "fields": [
-        {
-            "name": "timestamp",
-            "type": "int",
-            "min": 0,
-            "max": 9999999999
-        },
-        {
-            "name": "value",
-            "type": "double",
-            "min": 0.0,
-            "max": 100.0
-        },
-        {
-            "name": "label",
-            "type": "string",
-            "minLength": 5,
-            "maxLength": 20
-        },
-        {
-            "name": "active",
-            "type": "bool"
-        },
-        {
-            "name": "measurements",
-            "type": "array",
-            "arraySize": 5,
-            "items": {
-                "name": "measurement",
-                "type": "double",
-                "min": -100.0,
-                "max": 100.0
-            }
-        }
-    ]
+```flatbuffers
+namespace benchmark;
+
+attribute "min";
+attribute "max";
+attribute "min_length";
+attribute "max_length";
+attribute "min_items";
+attribute "max_items";
+
+table Measurement {
+    value: double (min: "-100.0", max: "100.0");
 }
+
+table BenchmarkMessage {
+    timestamp: uint64 (min: "0", max: "9999999999");
+    value: double (min: "0.0", max: "100.0");
+    label: string (min_length: "5", max_length: "20");
+    active: bool;
+    measurements: [Measurement] (min_items: "1", max_items: "5");
+}
+
+root_type BenchmarkMessage;
 ```
 
 ## Configuration
@@ -191,6 +172,9 @@ Example `config/publisher.ini`:
 ```ini
 [runtime]
 app_name = publisher
+
+[schema]
+bfbs = config/flatbuffers/benchmark.bfbs
 
 [publisher]
 type = iceoryx
@@ -202,7 +186,6 @@ rate_hz = 10
 
 [generator]
 algorithm = schema_guided
-schema = config/schemas/message.json
 seed = 42
 
 [serializer]
@@ -211,7 +194,7 @@ proto_message = osi::SensorViewMessage
 
 [dump]
 enabled = false
-output = dump/benchmark.jsonl
+output = dump/benchmark.bin
 ```
 
 ## Commit Convention

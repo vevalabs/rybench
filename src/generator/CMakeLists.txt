@@ -3,6 +3,7 @@ add_library(generator STATIC
     schema_guided/schema_guided_generator.cpp
     property_guided/property_guided_generator.cpp
     generator_factory.cpp
+    reflection_builder.cpp
 )
 
 target_include_directories(generator PUBLIC

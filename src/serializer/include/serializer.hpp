@@ -1,10 +1,10 @@
 #pragma once
 
-#include "data_value.hpp"
-#include "schema.hpp"
+#include "message.hpp"
 #include <vector>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace serializer {
 
@@ -12,15 +12,11 @@ class ISerializer {
 public:
     virtual ~ISerializer() = default;
 
-    // Serialize DataValue to binary format
-    virtual std::vector<uint8_t> serialize(const common::DataValue& value) = 0;
-
-    // Deserialize binary to DataValue
-    virtual common::DataValue deserialize(const std::vector<uint8_t>& data) = 0;
-
-    // Get schema describing expected data structure for generator
-    // Returns the schema that generator should use to produce DataValue
-    virtual common::Schema getSchema() const = 0;
+    // Serialize Message (FlatBuffer) to target format
+    // For flatbuffers: returns data as-is
+    // For json: converts to JSON
+    // For protobuf: converts to protobuf
+    virtual std::vector<uint8_t> serialize(const common::Message& msg) = 0;
 
     virtual std::string name() const = 0;
 };

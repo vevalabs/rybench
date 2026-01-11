@@ -1,6 +1,7 @@
 #include "config.hpp"
 #include <fstream>
 #include <stdexcept>
+#include <iostream>
 
 namespace common {
 
@@ -42,12 +43,21 @@ void Config::load(const std::string& filepath) {
     if (sections_.find("generator") == sections_.end()) {
         throw std::runtime_error("Config file should have generator section");
     }
-    if (sections_.find("serializer") == sections_.end()) {
-        throw std::runtime_error("Config file should have serializer section");
+    if (sections_.find("schema") == sections_.end()) {
+        throw std::runtime_error("Config file should have schema section");
     }
     if (sections_.find("dump") == sections_.end()) {
         throw std::runtime_error("Config file should have dump section");
     }
+    if (sections_.find("serializer") == sections_.end()) {
+        throw std::runtime_error("Config file should have serializer section");
+    }
+
+    // Load FlatBuffers schema from .bfbs file
+    std::string bfbsPath = get("schema", "bfbs", "config/schemas/benchmark.bfbs");
+    schema_.loadFromBfbs(bfbsPath);
+
+    std::cout << "Schema: " << schema_.rootTableName() << std::endl;
 }
 
 std::string Config::get(const std::string& section, const std::string& key,

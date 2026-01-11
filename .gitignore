@@ -6,3 +6,13 @@ build/
 
 # Tool-specific files
 CLAUDE.md
+
+# dump
+dump/*.jsonl
+dump/*.bin
+
+# bfbs files
+config/schemas/*.bfbs
+
+# Editor backup / temp files
+~

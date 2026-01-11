@@ -1,6 +1,8 @@
 #pragma once
 
 #include "schema.hpp"
+#include "flatbuffers_schema.hpp"
+#include "message.hpp"
 #include "data_value.hpp"
 #include <memory>
 #include <string>
@@ -18,8 +20,10 @@ class IGenerator {
 public:
     virtual ~IGenerator() = default;
 
-    virtual void loadSchema(const common::Schema& schema) = 0;
-    virtual common::DataValue generate() = 0;
+    // New FlatBuffers-based interface
+    virtual void loadSchema(const common::FlatBuffersSchema& schema) = 0;
+    virtual common::Message generate() = 0;
+
     virtual Algorithm algorithm() const = 0;
     virtual std::string name() const = 0;
 };

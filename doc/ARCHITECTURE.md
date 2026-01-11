@@ -7,12 +7,13 @@ src/
 ├── common/                          # Shared utilities and data types
 │   ├── include/
 │   │   ├── config.hpp               # INI configuration parser
-│   │   ├── data_value.hpp           # Generic data container (variant-based)
+│   │   ├── flatbuffers_schema.hpp   # FlatBuffers schema loader
+│   │   ├── message.hpp              # Message wrapper for FlatBuffer data
 │   │   ├── recorder.hpp             # Data recording utility
-│   │   ├── schema.hpp               # JSON schema definition
 │   │   └── signal_handler.hpp       # Signal handling utility
 │   ├── config.cpp
-│   ├── schema.cpp
+│   ├── flatbuffers_schema.cpp
+│   ├── message.cpp
 │   ├── recorder.cpp
 │   └── CMakeLists.txt
 │
@@ -34,7 +35,8 @@ src/
 ├── generator/                       # Data generator implementations
 │   ├── include/
 │   │   ├── generator.hpp            # IGenerator interface
-│   │   └── generator_factory.hpp    # Generator factory
+│   │   ├── generator_factory.hpp    # Generator factory
+│   │   └── reflection_builder.hpp   # FlatBuffer reflection builder
 │   ├── fixed/
 │   │   ├── include/
 │   │   │   └── fixed_generator.hpp
@@ -47,6 +49,7 @@ src/
 │   │   ├── include/
 │   │   │   └── property_guided_generator.hpp
 │   │   └── property_guided_generator.cpp
+│   ├── reflection_builder.cpp
 │   ├── generator_factory.cpp
 │   └── CMakeLists.txt
 │
@@ -66,9 +69,6 @@ src/
 │   │   ├── include/
 │   │   │   └── flatbuffers_serializer.hpp
 │   │   └── flatbuffers_serializer.cpp
-│   ├── messages/
-│   │   ├── osi_sensorview_pb.cpp    # Protobuf message registration
-│   │   └── osi_sensorview_fbs.cpp   # FlatBuffers message registration
 │   ├── serializer_factory.cpp
 │   └── CMakeLists.txt
 │
@@ -76,19 +76,49 @@ src/
 │   ├── main.cpp
 │   └── CMakeLists.txt
 │
-├── test/                            # Test consumers
-│   ├── consumer_json.cpp
-│   ├── consumer_protobuf.cpp
-│   ├── consumer_flatbuffers.cpp
-│   ├── zenoh_consumer_json.cpp
-│   ├── zenoh_consumer_protobuf.cpp
-│   └── zenoh_consumer_flatbuffers.cpp
-│
+test/
+├── consumer_json.cpp
+├── consumer_protobuf.cpp
+├── consumer_flatbuffers.cpp
+├── zenoh_consumer_json.cpp
+├── zenoh_consumer_protobuf.cpp
+└── zenoh_consumer_flatbuffers.cpp
+
 config/
 ├── publisher.ini                    # Publisher configuration
-├── schemas/                         # JSON schema definitions
-├── protos/                          # Protobuf definitions
-└── flatbuffers/                     # FlatBuffers definitions
+└── schemas/                         # FlatBuffers schema definitions
+    ├── benchmark.fbs                # FlatBuffers schema source
+    └── benchmark.bfbs               # Compiled binary schema
+```
+
+---
+
+## Internal Data Representation
+
+The framework uses **FlatBuffers binary format** as the internal message representation. This provides:
+- Zero-copy access to data
+- Runtime reflection via `.bfbs` schema
+- Efficient conversion to other formats
+
+```
+.fbs (schema source)
+    │
+    ▼ flatc --binary
+.bfbs (binary schema)
+    │
+    ▼ runtime
+┌─────────────────────────────────────────────┐
+│  FlatBuffersSchema (reflection)             │
+│  - Load and parse .bfbs                     │
+│  - Provide reflection::Schema for runtime   │
+└─────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────┐
+│  Message (FlatBuffer binary + schema ref)   │
+│  - Wraps raw FlatBuffer data                │
+│  - Carries schema reference                 │
+└─────────────────────────────────────────────┘
 ```
 
 ---
@@ -96,13 +126,30 @@ config/
 ## Data Flow
 
 ```
-Generator → DataValue → Serializer → Binary Data → Publisher → IPC
+Config (.ini)
+    │
+    ▼
+FlatBuffersSchema ← .bfbs file
+    │
+    ▼
+Generator (uses reflection to build FlatBuffer)
+    │
+    ▼
+Message (FlatBuffer binary)
+    │
+    ▼
+Serializer (converts to output format)
+    │
+    ├─ FlatBuffers → pass-through
+    ├─ JSON → FlatBuffer-to-JSON conversion
+    └─ Protobuf → FlatBuffer-to-Protobuf conversion (dynamic)
+    │
+    ▼
+Binary Data
+    │
+    ▼
+Publisher → IPC (iceoryx/zenoh)
 ```
-
-1. **Serializer** provides schema describing expected message structure
-2. **Generator** produces `DataValue` based on schema
-3. **Serializer** converts `DataValue` to binary format
-4. **Publisher** sends binary data via IPC (iceoryx/zenoh)
 
 ---
 
@@ -128,58 +175,28 @@ public:
     bool getBool(const std::string& section, const std::string& key,
                  bool defaultValue = false) const;
 
-    bool hasSection(const std::string& section) const;
-    bool hasKey(const std::string& section, const std::string& key) const;
-    const Sections& sections() const;
+    const FlatBuffersSchema& schema() const;  // Get loaded schema
 };
 
 }
 ```
 
-| Method | Description |
-|--------|-------------|
-| `load(filepath)` | Load INI file from path |
-| `get(section, key, default)` | Get string value |
-| `getInt(section, key, default)` | Get integer value |
-| `getDouble(section, key, default)` | Get double value |
-| `getBool(section, key, default)` | Get boolean value |
-| `hasSection(section)` | Check if section exists |
-| `hasKey(section, key)` | Check if key exists in section |
-| `sections()` | Get all sections as map |
-
 ---
 
-### common::Schema
+### common::FlatBuffersSchema
 
-JSON schema definition for data structure.
+FlatBuffers binary schema loader for runtime reflection.
 
 ```cpp
 namespace common {
 
-enum class FieldType { Int, Double, String, Bool, Array, Object };
-
-struct FieldConstraints {
-    std::optional<double> min;
-    std::optional<double> max;
-    std::optional<size_t> minLength;
-    std::optional<size_t> maxLength;
-    std::optional<size_t> arraySize;
-};
-
-struct SchemaField {
-    std::string name;
-    FieldType type;
-    FieldConstraints constraints;
-    std::vector<SchemaField> children;
-};
-
-class Schema {
+class FlatBuffersSchema {
 public:
-    void loadFromFile(const std::string& filepath);
-    void loadFromJson(const nlohmann::json& j);
+    void loadFromBfbs(const std::string& bfbsPath);
 
-    const std::vector<SchemaField>& fields() const;
-    const std::string& name() const;
+    const reflection::Schema* reflectionSchema() const;
+    const reflection::Object* rootTable() const;
+    std::string rootTableName() const;
 };
 
 }
@@ -187,54 +204,31 @@ public:
 
 | Method | Description |
 |--------|-------------|
-| `loadFromFile(filepath)` | Load schema from JSON file for json-serializer |
-| `loadFromJson(json)` | Load schema from JSON object - all serializers use to pass json to generator |
-| `fields()` | Get list of schema fields |
-| `name()` | Get schema name |
+| `loadFromBfbs(path)` | Load compiled .bfbs schema file |
+| `reflectionSchema()` | Get FlatBuffers reflection schema |
+| `rootTable()` | Get root table definition |
+| `rootTableName()` | Get root table name |
 
 ---
 
-### common::DataValue
+### common::Message
 
-Generic data container using `std::variant`.
+Wrapper for FlatBuffer binary data with schema reference.
 
 ```cpp
 namespace common {
 
-using DataObject = std::unordered_map<std::string, DataValue>;
-using DataArray = std::vector<DataValue>;
-
-class DataValue {
+class Message {
 public:
-    // Constructors for all types
-    DataValue();                          // null
-    DataValue(std::nullptr_t);            // null
-    DataValue(bool v);                    // boolean
-    DataValue(int v);                     // integer
-    DataValue(int64_t v);                 // integer
-    DataValue(double v);                  // double
-    DataValue(const std::string& v);      // string
-    DataValue(const DataArray& v);        // array
-    DataValue(const DataObject& v);       // object
+    Message() = default;
+    Message(std::vector<uint8_t> data, const reflection::Schema* schema = nullptr);
 
-    // Type checking
-    bool isNull() const;
-    bool isBool() const;
-    bool isInt() const;
-    bool isDouble() const;
-    bool isString() const;
-    bool isArray() const;
-    bool isObject() const;
+    const uint8_t* data() const;
+    size_t size() const;
+    bool empty() const;
 
-    // Value access
-    bool asBool() const;
-    int64_t asInt() const;
-    double asDouble() const;
-    const std::string& asString() const;
-    const DataArray& asArray() const;
-    const DataObject& asObject() const;
-    DataArray& asArray();
-    DataObject& asObject();
+    std::vector<uint8_t> buffer() const;
+    const reflection::Schema* schema() const;
 };
 
 }
@@ -242,38 +236,11 @@ public:
 
 | Method | Description |
 |--------|-------------|
-| `isNull/Bool/Int/Double/String/Array/Object()` | Check value type |
-| `asBool/Int/Double/String/Array/Object()` | Get value (throws if wrong type) |
-
----
-
-### common::Recorder
-
-Utility for recording data to JSONL files.
-
-```cpp
-namespace common {
-
-class Recorder {
-public:
-    void open(const std::string& filepath);
-    void record(const DataValue& value);
-    void close();
-
-    size_t count() const;
-    bool isOpen() const;
-};
-
-}
-```
-
-| Method | Description |
-|--------|-------------|
-| `open(filepath)` | Open file for writing |
-| `record(value)` | Write DataValue as JSON line |
-| `close()` | Close file |
-| `count()` | Number of records written |
-| `isOpen()` | Check if file is open |
+| `data()` | Get pointer to raw FlatBuffer data |
+| `size()` | Get data size in bytes |
+| `empty()` | Check if message is empty |
+| `buffer()` | Get copy of data as vector |
+| `schema()` | Get associated reflection schema |
 
 ---
 
@@ -290,24 +257,23 @@ class IGenerator {
 public:
     virtual ~IGenerator() = default;
 
-    virtual void loadSchema(const common::Schema& schema) = 0;
-    virtual common::DataValue generate() = 0;
+    virtual void loadSchema(const common::FlatBuffersSchema& schema) = 0;
+    virtual common::Message generate() = 0;
     virtual Algorithm algorithm() const = 0;
     virtual std::string name() const = 0;
 };
 
 using GeneratorPtr = std::unique_ptr<IGenerator>;
 
-// Factory function
-GeneratorPtr createGenerator(const common::Config& config, const common::Schema& schema);
+GeneratorPtr createGenerator(const common::Config& config);
 
 }
 ```
 
 | Method | Description |
 |--------|-------------|
-| `loadSchema(schema)` | Load schema for data generation which created by serializer on start |
-| `generate()` | Generate next data value |
+| `loadSchema(schema)` | Load FlatBuffers schema for generation |
+| `generate()` | Generate next Message (FlatBuffer binary) |
 | `algorithm()` | Get generator algorithm type |
 | `name()` | Get generator name |
 
@@ -315,27 +281,9 @@ GeneratorPtr createGenerator(const common::Config& config, const common::Schema&
 
 | Class | Algorithm | Description |
 |-------|-----------|-------------|
-| `FixedGenerator` | Fixed | Returns fixed/pre-recorded data |
-| `SchemaGuidedGenerator` | SchemaGuided | Random data based on schema constraints |
-| `PropertyGuidedGenerator` | PropertyGuided | Custom property generators per field - not implemented yet |
-
-##### FixedGenerator (additional methods)
-
-```cpp
-void loadDump(const std::string& filepath);  // Load JSONL dump file - only opens file, reads and generates for evey cycle
-void reset();                                  // Reset to beginning
-bool finished() const;                         // Check if dump exhausted
-```
-
-##### SchemaGuidedGenerator (additional methods)
-```cpp
-// No additional methods
-```
-##### PropertyGuidedGenerator (additional methods)
-
-```cpp
-// Not decided 
-```
+| `FixedGenerator` | Fixed | Replay from recorded data |
+| `SchemaGuidedGenerator` | SchemaGuided | Random data using FlatBuffers reflection |
+| `PropertyGuidedGenerator` | PropertyGuided | Custom property generators per field |
 
 ---
 
@@ -365,19 +313,8 @@ public:
 
 using PublisherPtr = std::unique_ptr<IPublisher>;
 
-// Factory functions
-PublisherConfig createPublisherConfig(const common::Config& config);
-PublisherPtr createPublisher(const common::Config& config);
-
 }
 ```
-
-| Method | Description |
-|--------|-------------|
-| `init(config)` | Initialize publisher with configuration |
-| `publish(data, size)` | Publish binary data, returns success |
-| `shutdown()` | Cleanup and shutdown |
-| `name()` | Get publisher name |
 
 #### Implementations
 
@@ -386,17 +323,11 @@ PublisherPtr createPublisher(const common::Config& config);
 | `IceoryxPublisher` | iceoryx | Zero-copy shared memory IPC |
 | `ZenohPublisher` | Zenoh | Network-capable pub/sub |
 
-##### IceoryxPublisher (additional methods)
-
-```cpp
-static void initRuntime(const std::string& appName);  // Initialize iceoryx runtime
-```
-
 ---
 
 ### serializer::ISerializer
 
-Interface for data serialization.
+Interface for output serialization. Converts internal FlatBuffer representation to output format.
 
 ```cpp
 namespace serializer {
@@ -405,15 +336,12 @@ class ISerializer {
 public:
     virtual ~ISerializer() = default;
 
-    virtual std::vector<uint8_t> serialize(const common::DataValue& value) = 0;
-    virtual common::DataValue deserialize(const std::vector<uint8_t>& data) = 0;
-    virtual common::Schema getSchema() const = 0;
+    virtual std::vector<uint8_t> serialize(const common::Message& msg) = 0;
     virtual std::string name() const = 0;
 };
 
 using SerializerPtr = std::unique_ptr<ISerializer>;
 
-// Factory function
 SerializerPtr createSerializer(const common::Config& config);
 
 }
@@ -421,57 +349,66 @@ SerializerPtr createSerializer(const common::Config& config);
 
 | Method | Description |
 |--------|-------------|
-| `serialize(value)` | Convert DataValue to binary |
-| `deserialize(data)` | Convert binary to DataValue |
-| `getSchema()` | Get schema for generator |
+| `serialize(msg)` | Convert Message to output binary format |
 | `name()` | Get serializer name |
 
 #### Implementations
 
 | Class | Format | Description |
 |-------|--------|-------------|
-| `JsonSerializer` | JSON | Human-readable JSON format |
-| `ProtobufSerializer` | Protobuf | Google Protocol Buffers |
-| `FlatbuffersSerializer` | FlatBuffers | Zero-copy serialization |
+| `FlatbuffersSerializer` | FlatBuffers | Pass-through (data already in FlatBuffers format) |
+| `JsonSerializer` | JSON | Converts FlatBuffer to JSON using reflection |
+| `ProtobufSerializer` | Protobuf | Converts FlatBuffer to Protobuf using dynamic messages |
 
-##### ProtobufSerializer (additional methods)
+##### FlatbuffersSerializer
 
-```cpp
-explicit ProtobufSerializer(const std::string& messageName = "",
-                            const std::string& fieldsConfigPath = "");
-
-template<typename T>
-static void registerMessage(const std::string& name);
-static std::vector<std::string> availableMessages();
-static std::string availableMessagesStr();
-static MessageFactory getFactory(const std::string& name);
-```
-
-| Method | Description |
-|--------|-------------|
-| `ProtobufSerializer(messageName, fieldsConfigPath)` | Constructor with message type name and optional field constraints file |
-| `registerMessage<T>(name)` | Register a protobuf message type for serialization |
-| `availableMessages()` | Get list of all registered message type names |
-| `availableMessagesStr()` | Get comma-separated string of registered message types |
-| `getFactory(name)` | Get factory function for creating message by name |
-
-##### FlatbuffersSerializer (additional methods)
+Simple pass-through serializer - returns the FlatBuffer data as-is.
 
 ```cpp
-explicit FlatbuffersSerializer(const std::string& messageName = "",
-                               const std::string& bfbsPath = "");
+class FlatbuffersSerializer : public ISerializer {
+public:
+    FlatbuffersSerializer() = default;
 
-static void registerMessage(const std::string& name, BuilderFunc builder, ParserFunc parser);
-static std::vector<std::string> availableMessages();
-static std::string availableMessagesStr();
+    std::vector<uint8_t> serialize(const common::Message& msg) override;
+    std::string name() const override;
+};
 ```
 
-| Method | Description |
-|--------|-------------|
-| `FlatbuffersSerializer(messageName, bfbsPath)` | Constructor with message type name and optional binary schema path (.bfbs) |
-| `registerMessage(name, builder, parser)` | Register message with custom build/parse functions |
-| `availableMessages()` | Get list of all registered message type names |
-| `availableMessagesStr()` | Get comma-separated string of registered message types |
+##### JsonSerializer
+
+Converts FlatBuffer to JSON using reflection.
+
+```cpp
+class JsonSerializer : public ISerializer {
+public:
+    explicit JsonSerializer(const std::string& bfbsPath = "");
+
+    std::vector<uint8_t> serialize(const common::Message& msg) override;
+    std::string name() const override;
+};
+```
+
+##### ProtobufSerializer
+
+Converts FlatBuffer to Protobuf using dynamic message generation from .bfbs schema.
+No pre-compiled .proto files or message registration required.
+
+```cpp
+class ProtobufSerializer : public ISerializer {
+public:
+    explicit ProtobufSerializer(const std::string& bfbsPath);
+
+    std::vector<uint8_t> serialize(const common::Message& msg) override;
+    std::string name() const override;
+};
+```
+
+**Key feature:** Builds Protobuf `FileDescriptorProto` dynamically from FlatBuffers schema at runtime:
+- Maps FlatBuffers tables → Protobuf messages
+- Maps FlatBuffers fields → Protobuf fields
+- Maps FlatBuffers enums → Protobuf enums
+- Uses `DynamicMessageFactory` to create messages without compiled .proto files
+
 ---
 
 ## Configuration
@@ -479,6 +416,12 @@ static std::string availableMessagesStr();
 ### publisher.ini Example
 
 ```ini
+[runtime]
+app_name = rybench
+
+[schema]
+bfbs = config/schemas/benchmark.bfbs
+
 [publisher]
 type = iceoryx          # iceoryx or zenoh
 service = Benchmark
@@ -488,15 +431,74 @@ rate_hz = 100
 max_payload_size = 65536
 
 [serializer]
-type = protobuf         # json, protobuf, or flatbuffers
-proto_message = osi::SensorViewMessage
+type = flatbuffers      # flatbuffers, json, or protobuf
 
 [generator]
-type = schema_guided    # fixed, schema_guided, or property_guided
-schema = config/schemas/sensor.json
+algorithm = schema_guided    # fixed, schema_guided, or property_guided
 seed = 0
 
 [dump]
 enabled = false
-output = dump/benchmark.jsonl
+output = dump/benchmark.bin
 ```
+
+### Configuration Options
+
+| Section | Key | Values | Description |
+|---------|-----|--------|-------------|
+| `[runtime]` | app_name | string | Application identifier |
+| `[schema]` | bfbs | path | FlatBuffers binary schema file |
+| `[publisher]` | type | iceoryx, zenoh | IPC transport |
+| | service | string | Service name |
+| | instance | string | Instance name |
+| | event | string | Event name |
+| | rate_hz | int | Publishing frequency |
+| | max_payload_size | int | Maximum message size |
+| `[serializer]` | type | flatbuffers, json, protobuf | Output format |
+| `[generator]` | algorithm | fixed, schema_guided, property_guided | Generation strategy |
+| | seed | int | Random seed (0 = random) |
+| `[dump]` | enabled | bool | Enable recording |
+| | output | path | Output file path |
+
+---
+
+## Schema Definition
+
+Schemas are defined in FlatBuffers format (`.fbs`) and compiled to binary (`.bfbs`):
+
+```bash
+flatc --binary --schema benchmark.fbs
+```
+
+Example schema (`benchmark.fbs`):
+
+```fbs
+namespace benchmark;
+
+enum SensorType : byte {
+    UNKNOWN = 0,
+    LIDAR = 1,
+    CAMERA = 2,
+    RADAR = 3
+}
+
+table Sensor {
+    id: uint64;
+    type: SensorType;
+    name: string;
+}
+
+table Packet {
+    timestamp: uint64;
+    sequence: uint32;
+    sensors: [Sensor];
+}
+
+root_type Packet;
+```
+
+The `.bfbs` file serves as the **single source of truth** for:
+- FlatBuffers data generation (via reflection)
+- FlatBuffers serialization (pass-through)
+- JSON conversion (via reflection)
+- Protobuf conversion (dynamic descriptor generation)

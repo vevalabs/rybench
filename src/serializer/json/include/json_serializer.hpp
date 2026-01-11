@@ -1,6 +1,7 @@
 #pragma once
 
 #include "serializer.hpp"
+#include "flatbuffers_schema.hpp"
 #include <nlohmann/json.hpp>
 #include <string>
 
@@ -8,18 +9,18 @@ namespace serializer {
 
 class JsonSerializer : public ISerializer {
 public:
-    explicit JsonSerializer(const std::string& schemaPath = "");
+    explicit JsonSerializer(const std::string& bfbsPath = "");
 
-    std::vector<uint8_t> serialize(const common::DataValue& value) override;
-    common::DataValue deserialize(const std::vector<uint8_t>& data) override;
-    common::Schema getSchema() const override;
+    std::vector<uint8_t> serialize(const common::Message& msg) override;
     std::string name() const override;
 
 private:
-    common::Schema schema_;
+    common::FlatBuffersSchema fbsSchema_;
 
-    nlohmann::json toJson(const common::DataValue& value);
-    common::DataValue fromJson(const nlohmann::json& j);
+    // FlatBuffer to JSON conversion helpers
+    nlohmann::json flatbufferToJson(const common::Message& msg);
+    nlohmann::json tableToJson(const reflection::Object* obj, const flatbuffers::Table* table);
+    nlohmann::json valueToJson(const reflection::Field* field, const flatbuffers::Table* table);
 };
 
 } // namespace serializer

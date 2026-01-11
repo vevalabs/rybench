@@ -1,5 +1,6 @@
 #pragma once
 
+#include "flatbuffers_schema.hpp"
 #include <string>
 #include <unordered_map>
 
@@ -24,9 +25,11 @@ public:
     bool hasKey(const std::string& section, const std::string& key) const;
 
     const Sections& sections() const { return sections_; }
+    const FlatBuffersSchema& schema() const { return schema_; }
 
 private:
     Sections sections_;
+    FlatBuffersSchema schema_;
 
     static std::string trim(const std::string& str);
 };
