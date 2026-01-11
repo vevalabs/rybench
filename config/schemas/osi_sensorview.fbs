@@ -1,0 +1,62 @@
+namespace osi;
+
+// Custom attributes for constraints
+attribute "min";
+attribute "max";
+attribute "min_length";
+attribute "max_length";
+attribute "min_items";
+attribute "max_items";
+
+// Separate vector tables for different constraint contexts
+table PositionVector3d {
+    x: double (min: "-10.0", max: "10.0");
+    y: double (min: "-10.0", max: "10.0");
+    z: double (min: "-1.0", max: "1.0");
+}
+
+table VelocityVector3d {
+    x: double (min: "-50.0", max: "50.0");
+    y: double (min: "-50.0", max: "50.0");
+    z: double (min: "-10.0", max: "10.0");
+}
+
+table OrientationVector3d {
+    x: double (min: "-3.14159", max: "3.14159");
+    y: double (min: "-3.14159", max: "3.14159");
+    z: double (min: "-3.14159", max: "3.14159");
+}
+
+table Timestamp {
+    seconds: int64 (min: "0", max: "1000000");
+    nanos: int32 (min: "0", max: "999999999");
+}
+
+table BaseMoving {
+    position: PositionVector3d;
+    velocity: VelocityVector3d;
+    orientation: OrientationVector3d;
+}
+
+enum ObjectType : byte {
+    TYPE_UNKNOWN = 0,
+    TYPE_VEHICLE = 1,
+    TYPE_PEDESTRIAN = 2,
+    TYPE_ANIMAL = 3
+}
+
+table MovingObject {
+    id: uint64 (min: "1", max: "10000");
+    base: BaseMoving;
+    type: ObjectType;
+}
+
+table SensorViewMessage {
+    timestamp: Timestamp;
+    sensor_id: uint64 (min: "1", max: "100");
+    moving_object: [MovingObject] (min_items: "1", max_items: "10");
+    sensor_name: string (min_length: "5", max_length: "20");
+    is_valid: bool;
+}
+
+root_type SensorViewMessage;

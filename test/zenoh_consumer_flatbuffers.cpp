@@ -15,7 +15,8 @@ void signalHandler(int) {
     running = false;
 }
 
-nlohmann::json vector3dToJson(const osi::Vector3d* vec) {
+template<typename VecType>
+nlohmann::json vector3dToJson(const VecType* vec) {
     if (!vec) return nullptr;
     return {{"x", vec->x()}, {"y", vec->y()}, {"z", vec->z()}};
 }

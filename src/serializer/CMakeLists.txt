@@ -3,8 +3,6 @@ add_library(serializer STATIC
     protobuf/protobuf_serializer.cpp
     flatbuffers/flatbuffers_serializer.cpp
     serializer_factory.cpp
-    messages/osi_sensorview_pb.cpp
-    messages/osi_sensorview_fbs.cpp
 )
 
 target_include_directories(serializer PUBLIC

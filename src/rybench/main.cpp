@@ -1,9 +1,8 @@
 #include "config.hpp"
 #include "signal_handler.hpp"
-#include "serializer_factory.hpp"
-#include "json_serializer.hpp"
 #include "generator_factory.hpp"
 #include "publisher_factory.hpp"
+#include "serializer_factory.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -30,7 +29,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Create serializer (knows the message structure)
+    // Create generator
+    generator::GeneratorPtr gen;
+    try {
+        gen = generator::createGenerator(config);
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to create generator: " << e.what() << std::endl;
+        return 1;
+    }
+    std::cout << "Generator: " << gen->name() << std::endl;
+
+    // Create serializer
     serializer::SerializerPtr ser;
     try {
         ser = serializer::createSerializer(config);
@@ -39,17 +48,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     std::cout << "Serializer: " << ser->name() << std::endl;
-
-    // Get schema from serializer and create generator
-    common::Schema schema = ser->getSchema();
-    generator::GeneratorPtr gen;
-    try {
-        gen = generator::createGenerator(config, schema);
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to create generator: " << e.what() << std::endl;
-        return 1;
-    }
-    std::cout << "Generator: " << gen->name() << std::endl;
 
     // Create publisher
     publisher::PublisherPtr pub;
@@ -65,13 +63,12 @@ int main(int argc, char* argv[]) {
     int rateHz = config.getInt("publisher", "rate_hz", 10);
     auto interval = std::chrono::milliseconds(1000 / rateHz);
 
-    // Dump setup
+    // Dump setup (binary FlatBuffers format)
     bool dumpEnabled = config.get("dump", "enabled", "false") == "true";
-    std::string dumpPath = config.get("dump", "output", "dump/benchmark.jsonl");
+    std::string dumpPath = config.get("dump", "output", "dump/benchmark.bin");
     std::ofstream dumpFile;
-    serializer::JsonSerializer jsonDumper;  // For converting DataValue to JSON
     if (dumpEnabled) {
-        dumpFile.open(dumpPath, std::ios::out | std::ios::trunc);
+        dumpFile.open(dumpPath, std::ios::out | std::ios::binary | std::ios::trunc);
         if (dumpFile.is_open()) {
             std::cout << "Dump: " << dumpPath << std::endl;
         } else {
@@ -84,25 +81,23 @@ int main(int argc, char* argv[]) {
 
     uint64_t messageCount = 0;
     while (running) {
-        common::DataValue data = gen->generate();
+        common::Message msg = gen->generate();
 
-        // Dump to file (JSON format)
+        if (msg.empty()) {
+            std::cout << "Generated empty message, skipping." << std::endl;
+            continue;
+        }
+
+        // Dump to file (binary format: size + data)
         if (dumpEnabled && dumpFile.is_open()) {
-            auto jsonBytes = jsonDumper.serialize(data);
-            dumpFile.write(reinterpret_cast<const char*>(jsonBytes.data()), jsonBytes.size());
-            dumpFile << '\n';
+            uint32_t msgSize = static_cast<uint32_t>(msg.size());
+            dumpFile.write(reinterpret_cast<const char*>(&msgSize), sizeof(msgSize));
+            dumpFile.write(reinterpret_cast<const char*>(msg.data()), msg.size());
         }
 
-        // Serialize to binary
-        std::vector<uint8_t> buffer = ser->serialize(data);
-
-        if (buffer.empty()) {
-            std::cout << "Generated empty buffer, skipping." << std::endl;
-            return 0;
-        }
-
-        // Publish
-        if (pub->publish(buffer.data(), buffer.size())) {
+        // Serialize and publish
+        auto serialized = ser->serialize(msg);
+        if (pub->publish(serialized.data(), serialized.size())) {
             messageCount++;
             if (messageCount % 100 == 0) {
                 std::cout << "Published " << messageCount << " messages" << std::endl;
