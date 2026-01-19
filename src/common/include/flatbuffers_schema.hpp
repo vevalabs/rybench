@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <flatbuffers/reflection.h>
 
+namespace rybench {
 namespace common {
 
 enum class FbsFieldType {
@@ -91,3 +92,4 @@ private:
 };
 
 } // namespace common
+} // namespace rybench

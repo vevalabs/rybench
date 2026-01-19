@@ -5,6 +5,7 @@
 
 #include <iostream>
 
+namespace rybench {
 namespace generator {
 
 GeneratorPtr createGenerator(const common::Config& config) {
@@ -45,3 +46,4 @@ GeneratorPtr createGenerator(const common::Config& config) {
 }
 
 } // namespace generator
+} // namespace rybench

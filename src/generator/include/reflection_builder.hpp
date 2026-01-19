@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <regex>
 
+namespace rybench {
 namespace generator {
 
 class ReflectionBuilder {
@@ -86,3 +87,4 @@ private:
 };
 
 } // namespace generator
+} // namespace rybench

@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 
+namespace rybench {
 namespace common {
 
 void Config::load(const std::string& filepath) {
@@ -120,3 +121,4 @@ std::string Config::trim(const std::string& str) {
 }
 
 } // namespace common
+} // namespace rybench

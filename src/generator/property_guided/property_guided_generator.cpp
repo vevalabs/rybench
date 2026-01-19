@@ -1,6 +1,7 @@
 #include "include/property_guided_generator.hpp"
 #include <chrono>
 
+namespace rybench {
 namespace generator {
 
 PropertyGuidedGenerator::PropertyGuidedGenerator()
@@ -81,3 +82,4 @@ std::string PropertyGuidedGenerator::name() const {
 }
 
 } // namespace generator
+} // namespace rybench

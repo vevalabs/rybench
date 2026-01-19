@@ -21,8 +21,8 @@ nlohmann::json vector3dToJson(const VecType* vec) {
 }
 
 int main() {
-    publisher::IceoryxPublisher::initRuntime("benchmark_consumer_flatbuffers");
-    common::SignalHandler::setup(running);
+    rybench::publisher::IceoryxPublisher::initRuntime("benchmark_consumer_flatbuffers");
+    rybench::common::SignalHandler::setup(running);
 
     iox::capro::ServiceDescription serviceDesc{
         iox::capro::IdString_t(iox::TruncateToCapacity, "Benchmark"),

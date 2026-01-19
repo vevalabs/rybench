@@ -2,6 +2,7 @@
 #include <flatbuffers/flatbuffers.h>
 #include <iostream>
 
+namespace rybench {
 namespace serializer {
 
 JsonSerializer::JsonSerializer(const std::string& bfbsPath) {
@@ -161,3 +162,4 @@ nlohmann::json JsonSerializer::valueToJson(const reflection::Field* field, const
 }
 
 } // namespace serializer
+} // namespace rybench

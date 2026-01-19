@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+namespace rybench {
 namespace publisher {
 
 class IceoryxPublisher : public IPublisher {
@@ -27,3 +28,4 @@ private:
 };
 
 } // namespace publisher
+} // namespace rybench

@@ -6,6 +6,7 @@
 #include <variant>
 #include <memory>
 
+namespace rybench {
 namespace common {
 
 class DataValue;
@@ -64,3 +65,4 @@ private:
 };
 
 } // namespace common
+} // namespace rybench

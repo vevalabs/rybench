@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+namespace rybench {
 namespace generator {
 
 enum class Algorithm {
@@ -31,3 +32,4 @@ public:
 using GeneratorPtr = std::unique_ptr<IGenerator>;
 
 } // namespace generator
+} // namespace rybench

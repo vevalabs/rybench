@@ -5,6 +5,7 @@
 #include <string>
 #include <flatbuffers/reflection.h>
 
+namespace rybench {
 namespace common {
 
 class Message {
@@ -46,3 +47,4 @@ private:
 };
 
 } // namespace common
+} // namespace rybench

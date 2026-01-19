@@ -5,6 +5,7 @@
 
 #include <iostream>
 
+namespace rybench {
 namespace serializer {
 
 SerializerPtr createSerializer(const common::Config& config) {
@@ -27,3 +28,4 @@ SerializerPtr createSerializer(const common::Config& config) {
 }
 
 } // namespace serializer
+} // namespace rybench

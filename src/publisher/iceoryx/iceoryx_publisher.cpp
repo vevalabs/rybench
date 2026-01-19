@@ -2,6 +2,7 @@
 #include <cstring>
 #include <iostream>
 
+namespace rybench {
 namespace publisher {
 
 void IceoryxPublisher::initRuntime(const std::string& appName) {
@@ -69,3 +70,4 @@ std::string IceoryxPublisher::name() const {
 }
 
 } // namespace publisher
+} // namespace rybench

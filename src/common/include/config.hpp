@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 
+namespace rybench {
 namespace common {
 
 class Config {
@@ -35,3 +36,4 @@ private:
 };
 
 } // namespace common
+} // namespace rybench

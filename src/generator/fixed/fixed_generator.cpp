@@ -1,6 +1,7 @@
 #include "include/fixed_generator.hpp"
 #include <stdexcept>
 
+namespace rybench {
 namespace generator {
 
 FixedGenerator::~FixedGenerator() {
@@ -85,3 +86,4 @@ common::Message FixedGenerator::buildFixedFromSchema() {
 }
 
 } // namespace generator
+} // namespace rybench

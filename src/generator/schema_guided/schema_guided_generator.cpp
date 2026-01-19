@@ -1,6 +1,7 @@
 #include "include/schema_guided_generator.hpp"
 #include <chrono>
 
+namespace rybench {
 namespace generator {
 
 SchemaGuidedGenerator::SchemaGuidedGenerator(uint64_t seed) {
@@ -32,3 +33,4 @@ std::string SchemaGuidedGenerator::name() const {
 }
 
 } // namespace generator
+} // namespace rybench
