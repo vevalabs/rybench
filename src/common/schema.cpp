@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <nlohmann/json.hpp>
 
+namespace rybench {
 namespace common {
 
 void Schema::loadFromFile(const std::string& filepath) {
@@ -76,3 +77,4 @@ FieldType Schema::parseType(const std::string& type) {
 }
 
 } // namespace common
+} // namespace rybench

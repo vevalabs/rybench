@@ -5,6 +5,7 @@
 #include <optional>
 #include <nlohmann/json_fwd.hpp>
 
+namespace rybench {
 namespace common {
 
 enum class FieldType {
@@ -51,3 +52,4 @@ private:
 };
 
 } // namespace common
+} // namespace rybench

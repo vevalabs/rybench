@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+namespace rybench {
 namespace publisher {
 
 class ZenohPublisher : public IPublisher {
@@ -26,3 +27,4 @@ private:
 };
 
 } // namespace publisher
+} // namespace rybench

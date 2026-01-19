@@ -3,9 +3,11 @@
 #include "publisher.hpp"
 #include "config.hpp"
 
+namespace rybench {
 namespace publisher {
 
 PublisherConfig createPublisherConfig(const common::Config& config);
 PublisherPtr createPublisher(const common::Config& config);
 
 } // namespace publisher
+} // namespace rybench

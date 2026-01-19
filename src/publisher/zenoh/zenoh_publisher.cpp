@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 
+namespace rybench {
 namespace publisher {
 
 ZenohPublisher::~ZenohPublisher() {
@@ -70,3 +71,4 @@ std::string ZenohPublisher::name() const {
 }
 
 } // namespace publisher
+} // namespace rybench

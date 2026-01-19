@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 
+namespace rybench {
 namespace serializer {
 
 class JsonSerializer : public ISerializer {
@@ -24,3 +25,4 @@ private:
 };
 
 } // namespace serializer
+} // namespace rybench

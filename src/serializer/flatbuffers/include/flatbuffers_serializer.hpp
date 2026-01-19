@@ -5,6 +5,7 @@
 #include <flatbuffers/reflection.h>
 #include <string>
 
+namespace rybench {
 namespace serializer {
 
 class FlatbuffersSerializer : public ISerializer {
@@ -16,3 +17,4 @@ public:
 };
 
 } // namespace serializer
+} // namespace rybench

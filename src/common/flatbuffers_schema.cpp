@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <algorithm>
 
+namespace rybench {
 namespace common {
 
 void FlatBuffersSchema::loadFromBfbs(const std::string& filepath) {
@@ -194,3 +195,4 @@ FbsFieldType FlatBuffersSchema::baseTypeToFieldType(reflection::BaseType baseTyp
 }
 
 } // namespace common
+} // namespace rybench

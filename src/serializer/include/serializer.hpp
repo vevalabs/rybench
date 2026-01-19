@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+namespace rybench {
 namespace serializer {
 
 class ISerializer {
@@ -24,3 +25,4 @@ public:
 using SerializerPtr = std::unique_ptr<ISerializer>;
 
 } // namespace serializer
+} // namespace rybench

@@ -12,8 +12,8 @@
 std::atomic<bool> running{true};
 
 int main() {
-    publisher::IceoryxPublisher::initRuntime("benchmark_consumer");
-    common::SignalHandler::setup(running);
+    rybench::publisher::IceoryxPublisher::initRuntime("benchmark_consumer");
+    rybench::common::SignalHandler::setup(running);
 
     iox::capro::ServiceDescription serviceDesc{
         iox::capro::IdString_t(iox::TruncateToCapacity, "Benchmark"),

@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 
+namespace rybench {
 namespace serializer {
 
 class ProtobufSerializer : public ISerializer {
@@ -49,3 +50,4 @@ private:
 };
 
 } // namespace serializer
+} // namespace rybench

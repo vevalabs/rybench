@@ -18,10 +18,10 @@ int main(int argc, char* argv[]) {
         configPath = argv[1];
     }
 
-    common::SignalHandler::setup(running);
+    rybench::common::SignalHandler::setup(running);
 
     // Load configuration
-    common::Config config;
+    rybench::common::Config config;
     try {
         config.load(configPath);
     } catch (const std::exception& e) {
@@ -30,9 +30,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Create generator
-    generator::GeneratorPtr gen;
+    rybench::generator::GeneratorPtr gen;
     try {
-        gen = generator::createGenerator(config);
+        gen = rybench::generator::createGenerator(config);
     } catch (const std::exception& e) {
         std::cerr << "Failed to create generator: " << e.what() << std::endl;
         return 1;
@@ -40,9 +40,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Generator: " << gen->name() << std::endl;
 
     // Create serializer
-    serializer::SerializerPtr ser;
+    rybench::serializer::SerializerPtr ser;
     try {
-        ser = serializer::createSerializer(config);
+        ser = rybench::serializer::createSerializer(config);
     } catch (const std::exception& e) {
         std::cerr << "Failed to create serializer: " << e.what() << std::endl;
         return 1;
@@ -50,9 +50,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Serializer: " << ser->name() << std::endl;
 
     // Create publisher
-    publisher::PublisherPtr pub;
+    rybench::publisher::PublisherPtr pub;
     try {
-        pub = publisher::createPublisher(config);
+        pub = rybench::publisher::createPublisher(config);
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return 1;
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
 
     uint64_t messageCount = 0;
     while (running) {
-        common::Message msg = gen->generate();
+        rybench::common::Message msg = gen->generate();
 
         if (msg.empty()) {
             std::cout << "Generated empty message, skipping." << std::endl;

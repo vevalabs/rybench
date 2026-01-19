@@ -8,6 +8,7 @@
 #include <vector>
 #include <memory>
 
+namespace rybench {
 namespace generator {
 
 class PropertyGuidedGenerator : public IGenerator {
@@ -67,3 +68,4 @@ private:
 };
 
 } // namespace generator
+} // namespace rybench

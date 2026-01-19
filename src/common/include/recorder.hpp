@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string>
 
+namespace rybench {
 namespace common {
 
 class Recorder {
@@ -24,3 +25,4 @@ private:
 };
 
 } // namespace common
+} // namespace rybench

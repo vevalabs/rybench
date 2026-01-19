@@ -3,6 +3,7 @@
 #include <atomic>
 #include <csignal>
 
+namespace rybench {
 namespace common {
 
 class SignalHandler {
@@ -24,3 +25,4 @@ private:
 };
 
 } // namespace common
+} // namespace rybench

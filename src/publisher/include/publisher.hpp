@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+namespace rybench {
 namespace publisher {
 
 struct PublisherConfig {
@@ -26,3 +27,4 @@ public:
 using PublisherPtr = std::unique_ptr<IPublisher>;
 
 } // namespace publisher
+} // namespace rybench

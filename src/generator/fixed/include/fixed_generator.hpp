@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 
+namespace rybench {
 namespace generator {
 
 class FixedGenerator : public IGenerator {
@@ -35,3 +36,4 @@ private:
 };
 
 } // namespace generator
+} // namespace rybench

@@ -6,6 +6,7 @@
 
 #include <stdexcept>
 
+namespace rybench {
 namespace publisher {
 
 PublisherConfig createPublisherConfig(const common::Config& config) {
@@ -47,3 +48,4 @@ PublisherPtr createPublisher(const common::Config& config) {
 }
 
 } // namespace publisher
+} // namespace rybench

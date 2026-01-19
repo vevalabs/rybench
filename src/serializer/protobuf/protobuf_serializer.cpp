@@ -3,6 +3,7 @@
 #include <cctype>
 #include <iostream>
 
+namespace rybench {
 namespace serializer {
 
 ProtobufSerializer::ProtobufSerializer(const std::string& bfbsPath)
@@ -403,3 +404,4 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
 }
 
 } // namespace serializer
+} // namespace rybench

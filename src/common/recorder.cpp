@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 
+namespace rybench {
 namespace common {
 
 namespace {
@@ -56,3 +57,4 @@ void Recorder::close() {
 }
 
 } // namespace common
+} // namespace rybench

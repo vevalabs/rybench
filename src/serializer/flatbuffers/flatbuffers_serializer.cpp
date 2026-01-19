@@ -1,5 +1,6 @@
 #include "flatbuffers_serializer.hpp"
 
+namespace rybench {
 namespace serializer {
 
 std::string FlatbuffersSerializer::name() const {
@@ -12,3 +13,4 @@ std::vector<uint8_t> FlatbuffersSerializer::serialize(const common::Message& msg
 }
 
 } // namespace serializer
+} // namespace rybench
