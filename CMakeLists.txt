@@ -35,6 +35,14 @@ endif()
 add_library(rapidjson INTERFACE)
 target_include_directories(rapidjson INTERFACE ${rapidjson_SOURCE_DIR}/include)
 
+# Fetch toml++ (header-only library)
+FetchContent_Declare(
+    tomlplusplus
+    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+    GIT_TAG v3.4.0
+)
+FetchContent_MakeAvailable(tomlplusplus)
+
 # Add subdirectories
 add_subdirectory(src/common)
 add_subdirectory(src/serializer)

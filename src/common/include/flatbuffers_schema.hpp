@@ -48,7 +48,6 @@ struct FbsSchemaField {
     // FlatBuffers reflection indices
     uint16_t fieldId = 0;           // Field ID in vtable
     int32_t typeIndex = -1;         // Index into schema objects array
-    reflection::BaseType baseType;  // Raw FlatBuffers base type
 
     bool isRequired = false;
     bool isVector = false;

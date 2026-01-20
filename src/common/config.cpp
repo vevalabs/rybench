@@ -1,57 +1,33 @@
 #include "config.hpp"
-#include <fstream>
+#include <toml++/toml.hpp>
 #include <stdexcept>
 #include <iostream>
 
 namespace rybench {
 namespace common {
 
+struct Config::Impl {
+    toml::table table;
+};
+
+Config::Config() : impl_(std::make_unique<Impl>()) {}
+Config::~Config() = default;
+Config::Config(Config&&) noexcept = default;
+Config& Config::operator=(Config&&) noexcept = default;
+
 void Config::load(const std::string& filepath) {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open config file: " + filepath);
+    try {
+        impl_->table = toml::parse_file(filepath);
+    } catch (const toml::parse_error& err) {
+        throw std::runtime_error("Failed to parse config file: " + std::string(err.what()));
     }
 
-    std::string line;
-    std::string currentSection;
-
-    while (std::getline(file, line)) {
-        line = trim(line);
-
-        if (line.empty() || line[0] == ';' || line[0] == '#') {
-            continue;
+    // Validate required sections
+    const char* requiredSections[] = {"runtime", "publisher", "generator", "schema", "dump", "serializer"};
+    for (const auto& section : requiredSections) {
+        if (!impl_->table.contains(section)) {
+            throw std::runtime_error(std::string("Config file should have ") + section + " section");
         }
-
-        if (line[0] == '[' && line.back() == ']') {
-            currentSection = line.substr(1, line.size() - 2);
-            sections_[currentSection] = Section{};
-        } else {
-            auto delimPos = line.find('=');
-            if (delimPos != std::string::npos) {
-                std::string key = trim(line.substr(0, delimPos));
-                std::string value = trim(line.substr(delimPos + 1));
-                sections_[currentSection][key] = value;
-            }
-        }
-    }
-
-    if (sections_.find("runtime") == sections_.end()) {
-        throw std::runtime_error("Config file should have runtime section");
-    }
-    if (sections_.find("publisher") == sections_.end()) {
-        throw std::runtime_error("Config file should have publisher section");
-    }
-    if (sections_.find("generator") == sections_.end()) {
-        throw std::runtime_error("Config file should have generator section");
-    }
-    if (sections_.find("schema") == sections_.end()) {
-        throw std::runtime_error("Config file should have schema section");
-    }
-    if (sections_.find("dump") == sections_.end()) {
-        throw std::runtime_error("Config file should have dump section");
-    }
-    if (sections_.find("serializer") == sections_.end()) {
-        throw std::runtime_error("Config file should have serializer section");
     }
 
     // Load FlatBuffers schema from .bfbs file
@@ -63,61 +39,50 @@ void Config::load(const std::string& filepath) {
 
 std::string Config::get(const std::string& section, const std::string& key,
                         const std::string& defaultValue) const {
-    auto secIt = sections_.find(section);
-    if (secIt == sections_.end()) {
-        return defaultValue;
+    if (auto sec = impl_->table[section].as_table()) {
+        if (auto val = (*sec)[key].value<std::string>()) {
+            return *val;
+        }
     }
-    auto keyIt = secIt->second.find(key);
-    if (keyIt == secIt->second.end()) {
-        return defaultValue;
-    }
-    return keyIt->second;
+    return defaultValue;
 }
 
 int Config::getInt(const std::string& section, const std::string& key, int defaultValue) const {
-    std::string value = get(section, key);
-    if (value.empty()) {
-        return defaultValue;
+    if (auto sec = impl_->table[section].as_table()) {
+        if (auto val = (*sec)[key].value<int64_t>()) {
+            return static_cast<int>(*val);
+        }
     }
-    return std::stoi(value);
+    return defaultValue;
 }
 
 double Config::getDouble(const std::string& section, const std::string& key, double defaultValue) const {
-    std::string value = get(section, key);
-    if (value.empty()) {
-        return defaultValue;
+    if (auto sec = impl_->table[section].as_table()) {
+        if (auto val = (*sec)[key].value<double>()) {
+            return *val;
+        }
     }
-    return std::stod(value);
+    return defaultValue;
 }
 
 bool Config::getBool(const std::string& section, const std::string& key, bool defaultValue) const {
-    std::string value = get(section, key);
-    if (value.empty()) {
-        return defaultValue;
+    if (auto sec = impl_->table[section].as_table()) {
+        if (auto val = (*sec)[key].value<bool>()) {
+            return *val;
+        }
     }
-    return value == "true" || value == "1" || value == "yes";
+    return defaultValue;
 }
 
 bool Config::hasSection(const std::string& section) const {
-    return sections_.find(section) != sections_.end();
+    return impl_->table.contains(section);
 }
 
 bool Config::hasKey(const std::string& section, const std::string& key) const {
-    auto secIt = sections_.find(section);
-    if (secIt == sections_.end()) {
-        return false;
+    if (auto sec = impl_->table[section].as_table()) {
+        return sec->contains(key);
     }
-    return secIt->second.find(key) != secIt->second.end();
-}
-
-std::string Config::trim(const std::string& str) {
-    const char* whitespace = " \t\r\n";
-    size_t start = str.find_first_not_of(whitespace);
-    if (start == std::string::npos) {
-        return "";
-    }
-    size_t end = str.find_last_not_of(whitespace);
-    return str.substr(start, end - start + 1);
+    return false;
 }
 
 } // namespace common

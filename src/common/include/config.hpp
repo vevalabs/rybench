@@ -2,17 +2,17 @@
 
 #include "flatbuffers_schema.hpp"
 #include <string>
-#include <unordered_map>
+#include <memory>
 
 namespace rybench {
 namespace common {
 
 class Config {
 public:
-    using Section = std::unordered_map<std::string, std::string>;
-    using Sections = std::unordered_map<std::string, Section>;
-
-    Config() = default;
+    Config();
+    ~Config();
+    Config(Config&&) noexcept;
+    Config& operator=(Config&&) noexcept;
 
     void load(const std::string& filepath);
 
@@ -25,14 +25,12 @@ public:
     bool hasSection(const std::string& section) const;
     bool hasKey(const std::string& section, const std::string& key) const;
 
-    const Sections& sections() const { return sections_; }
     const FlatBuffersSchema& schema() const { return schema_; }
 
 private:
-    Sections sections_;
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
     FlatBuffersSchema schema_;
-
-    static std::string trim(const std::string& str);
 };
 
 } // namespace common
