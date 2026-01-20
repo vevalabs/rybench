@@ -6,7 +6,7 @@
 src/
 ├── common/                          # Shared utilities and data types
 │   ├── include/
-│   │   ├── config.hpp               # INI configuration parser
+│   │   ├── config.hpp               # TOML configuration parser
 │   │   ├── flatbuffers_schema.hpp   # FlatBuffers schema loader
 │   │   ├── message.hpp              # Message wrapper for FlatBuffer data
 │   │   ├── recorder.hpp             # Data recording utility
@@ -85,7 +85,7 @@ test/
 └── zenoh_consumer_flatbuffers.cpp
 
 config/
-├── publisher.ini                    # Publisher configuration
+├── publisher.toml                   # Publisher configuration
 └── schemas/                         # FlatBuffers schema definitions
     ├── benchmark.fbs                # FlatBuffers schema source
     └── benchmark.bfbs               # Compiled binary schema
@@ -126,7 +126,7 @@ The framework uses **FlatBuffers binary format** as the internal message represe
 ## Data Flow
 
 ```
-Config (.ini)
+Config (.toml)
     │
     ▼
 FlatBuffersSchema ← .bfbs file
@@ -155,11 +155,12 @@ Publisher → IPC (iceoryx/zenoh)
 
 ## Interfaces
 
-### common::Config
+### rybench::common::Config
 
-INI configuration file parser.
+TOML configuration file parser.
 
 ```cpp
+namespace rybench {
 namespace common {
 
 class Config {
@@ -178,16 +179,18 @@ public:
     const FlatBuffersSchema& schema() const;  // Get loaded schema
 };
 
-}
+} // namespace common
+} // namespace rybench
 ```
 
 ---
 
-### common::FlatBuffersSchema
+### rybench::common::FlatBuffersSchema
 
 FlatBuffers binary schema loader for runtime reflection.
 
 ```cpp
+namespace rybench {
 namespace common {
 
 class FlatBuffersSchema {
@@ -199,7 +202,8 @@ public:
     std::string rootTableName() const;
 };
 
-}
+} // namespace common
+} // namespace rybench
 ```
 
 | Method | Description |
@@ -211,11 +215,12 @@ public:
 
 ---
 
-### common::Message
+### rybench::common::Message
 
 Wrapper for FlatBuffer binary data with schema reference.
 
 ```cpp
+namespace rybench {
 namespace common {
 
 class Message {
@@ -231,7 +236,8 @@ public:
     const reflection::Schema* schema() const;
 };
 
-}
+} // namespace common
+} // namespace rybench
 ```
 
 | Method | Description |
@@ -244,11 +250,12 @@ public:
 
 ---
 
-### generator::IGenerator
+### rybench::generator::IGenerator
 
 Interface for data generators.
 
 ```cpp
+namespace rybench {
 namespace generator {
 
 enum class Algorithm { Fixed, SemiRandom, SchemaGuided, PropertyGuided };
@@ -267,7 +274,8 @@ using GeneratorPtr = std::unique_ptr<IGenerator>;
 
 GeneratorPtr createGenerator(const common::Config& config);
 
-}
+} // namespace generator
+} // namespace rybench
 ```
 
 | Method | Description |
@@ -287,11 +295,12 @@ GeneratorPtr createGenerator(const common::Config& config);
 
 ---
 
-### publisher::IPublisher
+### rybench::publisher::IPublisher
 
 Interface for IPC publishers.
 
 ```cpp
+namespace rybench {
 namespace publisher {
 
 struct PublisherConfig {
@@ -313,7 +322,8 @@ public:
 
 using PublisherPtr = std::unique_ptr<IPublisher>;
 
-}
+} // namespace publisher
+} // namespace rybench
 ```
 
 #### Implementations
@@ -325,11 +335,12 @@ using PublisherPtr = std::unique_ptr<IPublisher>;
 
 ---
 
-### serializer::ISerializer
+### rybench::serializer::ISerializer
 
 Interface for output serialization. Converts internal FlatBuffer representation to output format.
 
 ```cpp
+namespace rybench {
 namespace serializer {
 
 class ISerializer {
@@ -344,7 +355,8 @@ using SerializerPtr = std::unique_ptr<ISerializer>;
 
 SerializerPtr createSerializer(const common::Config& config);
 
-}
+} // namespace serializer
+} // namespace rybench
 ```
 
 | Method | Description |
@@ -413,33 +425,33 @@ public:
 
 ## Configuration
 
-### publisher.ini Example
+### publisher.toml Example
 
-```ini
+```toml
 [runtime]
-app_name = rybench
+app_name = "rybench"
 
 [schema]
-bfbs = config/schemas/benchmark.bfbs
+bfbs = "config/schemas/benchmark.bfbs"
 
 [publisher]
-type = iceoryx          # iceoryx or zenoh
-service = Benchmark
-instance = Default
-event = Data
+type = "iceoryx"          # iceoryx or zenoh
+service = "Benchmark"
+instance = "Default"
+event = "Data"
 rate_hz = 100
 max_payload_size = 65536
 
 [serializer]
-type = flatbuffers      # flatbuffers, json, or protobuf
+type = "flatbuffers"      # flatbuffers, json, or protobuf
 
 [generator]
-algorithm = schema_guided    # fixed, schema_guided, or property_guided
+algorithm = "schema_guided"    # fixed, schema_guided, or property_guided
 seed = 0
 
 [dump]
 enabled = false
-output = dump/benchmark.bin
+output = "dump/benchmark.bin"
 ```
 
 ### Configuration Options

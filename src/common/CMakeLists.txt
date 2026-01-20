@@ -58,6 +58,7 @@ target_include_directories(common PUBLIC
 
 target_link_libraries(common PUBLIC
     rapidjson
+    tomlplusplus::tomlplusplus
     iceoryx_posh::iceoryx_posh
     iceoryx_hoofs::iceoryx_hoofs
     ${Protobuf_LIBRARIES}

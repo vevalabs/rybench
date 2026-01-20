@@ -63,9 +63,10 @@ FbsSchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
     FbsSchemaField sf;
     sf.name = field->name()->str();
     sf.fieldId = field->id();
-    sf.baseType = field->type()->base_type();
     sf.isRequired = field->required();
-    sf.isVector = (sf.baseType == reflection::BaseType::Vector);
+
+    auto baseType = field->type()->base_type();
+    sf.isVector = (baseType == reflection::BaseType::Vector);
 
     // Determine field type
     if (sf.isVector) {
@@ -87,10 +88,9 @@ FbsSchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
             FbsSchemaField elementField;
             elementField.name = "element";
             elementField.type = baseTypeToFieldType(elementType);
-            elementField.baseType = elementType;
             sf.children.push_back(elementField);
         }
-    } else if (sf.baseType == reflection::BaseType::Obj) {
+    } else if (baseType == reflection::BaseType::Obj) {
         sf.typeIndex = field->type()->index();
         if (sf.typeIndex >= 0) {
             auto* obj = reflSchema_->objects()->Get(sf.typeIndex);
@@ -101,7 +101,7 @@ FbsSchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
             }
         }
     } else {
-        sf.type = baseTypeToFieldType(sf.baseType);
+        sf.type = baseTypeToFieldType(baseType);
     }
 
     // Parse constraints from attributes
