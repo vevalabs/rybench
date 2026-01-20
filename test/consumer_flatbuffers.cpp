@@ -4,7 +4,9 @@
 #include "iceoryx_posh/mepoo/chunk_header.hpp"
 
 #include "osi_sensorview_generated.h"
-#include <nlohmann/json.hpp>
+#include <rapidjson/document.h>
+#include <rapidjson/prettywriter.h>
+#include <rapidjson/stringbuffer.h>
 
 #include <iostream>
 #include <thread>
@@ -15,9 +17,16 @@
 std::atomic<bool> running{true};
 
 template<typename VecType>
-nlohmann::json vector3dToJson(const VecType* vec) {
-    if (!vec) return nullptr;
-    return {{"x", vec->x()}, {"y", vec->y()}, {"z", vec->z()}};
+void writeVector3d(rapidjson::PrettyWriter<rapidjson::StringBuffer>& writer, const VecType* vec) {
+    if (!vec) {
+        writer.Null();
+        return;
+    }
+    writer.StartObject();
+    writer.Key("x"); writer.Double(vec->x());
+    writer.Key("y"); writer.Double(vec->y());
+    writer.Key("z"); writer.Double(vec->z());
+    writer.EndObject();
 }
 
 int main() {
@@ -44,53 +53,62 @@ int main() {
 
                 auto msg = osi::GetSensorViewMessage(payload);
 
-                nlohmann::json output;
+                rapidjson::StringBuffer buffer;
+                rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+
+                writer.StartObject();
 
                 if (msg->timestamp()) {
-                    output["timestamp"] = {
-                        {"seconds", msg->timestamp()->seconds()},
-                        {"nanos", msg->timestamp()->nanos()}
-                    };
+                    writer.Key("timestamp");
+                    writer.StartObject();
+                    writer.Key("seconds"); writer.Int64(msg->timestamp()->seconds());
+                    writer.Key("nanos"); writer.Int(msg->timestamp()->nanos());
+                    writer.EndObject();
                 }
 
-                output["sensor_id"] = msg->sensor_id();
-                output["sensor_name"] = msg->sensor_name() ? msg->sensor_name()->str() : "";
-                output["is_valid"] = msg->is_valid();
+                writer.Key("sensor_id"); writer.Uint(msg->sensor_id());
+                writer.Key("sensor_name"); writer.String(msg->sensor_name() ? msg->sensor_name()->c_str() : "");
+                writer.Key("is_valid"); writer.Bool(msg->is_valid());
 
-                nlohmann::json movingObjects = nlohmann::json::array();
+                writer.Key("moving_object");
+                writer.StartArray();
                 if (msg->moving_object()) {
                     for (const auto* mo : *msg->moving_object()) {
-                        nlohmann::json moJson;
-                        moJson["id"] = mo->id();
+                        writer.StartObject();
+                        writer.Key("id"); writer.Uint(mo->id());
 
                         if (mo->base()) {
-                            moJson["base"] = {
-                                {"position", vector3dToJson(mo->base()->position())},
-                                {"velocity", vector3dToJson(mo->base()->velocity())},
-                                {"orientation", vector3dToJson(mo->base()->orientation())}
-                            };
+                            writer.Key("base");
+                            writer.StartObject();
+                            writer.Key("position"); writeVector3d(writer, mo->base()->position());
+                            writer.Key("velocity"); writeVector3d(writer, mo->base()->velocity());
+                            writer.Key("orientation"); writeVector3d(writer, mo->base()->orientation());
+                            writer.EndObject();
                         }
 
+                        writer.Key("type");
                         switch (mo->type()) {
                             case osi::ObjectType_TYPE_VEHICLE:
-                                moJson["type"] = "TYPE_VEHICLE";
+                                writer.String("TYPE_VEHICLE");
                                 break;
                             case osi::ObjectType_TYPE_PEDESTRIAN:
-                                moJson["type"] = "TYPE_PEDESTRIAN";
+                                writer.String("TYPE_PEDESTRIAN");
                                 break;
                             case osi::ObjectType_TYPE_ANIMAL:
-                                moJson["type"] = "TYPE_ANIMAL";
+                                writer.String("TYPE_ANIMAL");
                                 break;
                             default:
-                                moJson["type"] = "TYPE_UNKNOWN";
+                                writer.String("TYPE_UNKNOWN");
                         }
 
-                        movingObjects.push_back(moJson);
+                        writer.EndObject();
                     }
                 }
-                output["moving_object"] = movingObjects;
+                writer.EndArray();
 
-                std::cout << "[" << messageCount << "] " << output.dump(2) << std::endl;
+                writer.EndObject();
+
+                std::cout << "[" << messageCount << "] " << buffer.GetString() << std::endl;
 
                 subscriber.release(payload);
             });

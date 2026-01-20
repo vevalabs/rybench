@@ -19,13 +19,21 @@ if(zenohc_FOUND)
     find_package(zenohcxx QUIET)
 endif()
 
-# Fetch nlohmann/json
+# Fetch RapidJSON (header-only library)
 include(FetchContent)
 FetchContent_Declare(
-    json
-    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    rapidjson
+    GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
+    GIT_TAG master
 )
-FetchContent_MakeAvailable(json)
+FetchContent_GetProperties(rapidjson)
+if(NOT rapidjson_POPULATED)
+    FetchContent_Populate(rapidjson)
+endif()
+
+# Create interface library for RapidJSON (header-only, skip its CMakeLists.txt)
+add_library(rapidjson INTERFACE)
+target_include_directories(rapidjson INTERFACE ${rapidjson_SOURCE_DIR}/include)
 
 # Add subdirectories
 add_subdirectory(src/common)

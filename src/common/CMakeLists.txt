@@ -43,8 +43,6 @@ endforeach()
 
 add_library(common STATIC
     config.cpp
-    schema.cpp
-    recorder.cpp
     message.cpp
     flatbuffers_schema.cpp
     ${PROTO_SRCS}
@@ -59,7 +57,7 @@ target_include_directories(common PUBLIC
 )
 
 target_link_libraries(common PUBLIC
-    nlohmann_json::nlohmann_json
+    rapidjson
     iceoryx_posh::iceoryx_posh
     iceoryx_hoofs::iceoryx_hoofs
     ${Protobuf_LIBRARIES}

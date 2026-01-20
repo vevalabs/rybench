@@ -1,9 +1,7 @@
 #pragma once
 
-#include "schema.hpp"
 #include "flatbuffers_schema.hpp"
 #include "message.hpp"
-#include "data_value.hpp"
 #include <memory>
 #include <string>
 

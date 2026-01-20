@@ -2,7 +2,8 @@
 
 #include "serializer.hpp"
 #include "flatbuffers_schema.hpp"
-#include <nlohmann/json.hpp>
+#include <rapidjson/writer.h>
+#include <rapidjson/stringbuffer.h>
 #include <string>
 
 namespace rybench {
@@ -18,10 +19,10 @@ public:
 private:
     common::FlatBuffersSchema fbsSchema_;
 
-    // FlatBuffer to JSON conversion helpers
-    nlohmann::json flatbufferToJson(const common::Message& msg);
-    nlohmann::json tableToJson(const reflection::Object* obj, const flatbuffers::Table* table);
-    nlohmann::json valueToJson(const reflection::Field* field, const flatbuffers::Table* table);
+    // FlatBuffer to JSON conversion helpers using RapidJSON Writer
+    void flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const common::Message& msg);
+    void tableToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const reflection::Object* obj, const flatbuffers::Table* table);
+    void valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const reflection::Field* field, const flatbuffers::Table* table);
 };
 
 } // namespace serializer
