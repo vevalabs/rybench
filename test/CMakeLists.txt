@@ -1,42 +1,46 @@
-add_executable(consumer_json
-    consumer_json.cpp
-)
+# Iceoryx2 consumers (only if Iceoryx2 is available)
+if(BUILD_ICEORYX2_APP AND TARGET Iceoryx2::cxx)
+    add_executable(iceoryx2_consumer_json
+        iceoryx2_consumer_json.cpp
+    )
 
-target_link_libraries(consumer_json PRIVATE
-    common
-    publisher
-    iceoryx_posh::iceoryx_posh
-)
+    add_executable(iceoryx2_consumer_protobuf
+        iceoryx2_consumer_protobuf.cpp
+    )
 
-add_executable(consumer_protobuf
-    consumer_protobuf.cpp
-)
+    add_executable(iceoryx2_consumer_flatbuffers
+        iceoryx2_consumer_flatbuffers.cpp
+    )
 
-target_link_libraries(consumer_protobuf PRIVATE
-    common
-    publisher
-    iceoryx_posh::iceoryx_posh
-    protobuf::libprotobuf
-)
+    target_link_libraries(iceoryx2_consumer_json PRIVATE
+        Iceoryx2::cxx
+    )
 
-target_include_directories(consumer_protobuf PRIVATE
-    ${CMAKE_BINARY_DIR}/src/common
-)
+    target_link_libraries(iceoryx2_consumer_protobuf PRIVATE
+        Iceoryx2::cxx
+        rybench
+    )
 
-add_executable(consumer_flatbuffers
-    consumer_flatbuffers.cpp
-)
+    target_link_libraries(iceoryx2_consumer_flatbuffers PRIVATE
+        Iceoryx2::cxx
+        rybench
+        rapidjson
+    )
 
-target_link_libraries(consumer_flatbuffers PRIVATE
-    common
-    publisher
-    iceoryx_posh::iceoryx_posh
-    flatbuffers
-)
+    # Include generated headers (same as Zenoh)
+    target_include_directories(iceoryx2_consumer_protobuf PRIVATE
+        ${CMAKE_BINARY_DIR}/src/rybench
+    )
 
-target_include_directories(consumer_flatbuffers PRIVATE
-    ${CMAKE_BINARY_DIR}/src/common
-)
+    target_include_directories(iceoryx2_consumer_flatbuffers PRIVATE
+        ${CMAKE_BINARY_DIR}/src/rybench
+    )
+
+    message(STATUS "Iceoryx2 consumers: ENABLED")
+else()
+    message(STATUS "Iceoryx2 consumers: DISABLED (iceoryx2 not available)")
+endif()
+
 
 # Zenoh consumers (only if Zenoh C++ bindings are available)
 if(zenohcxx_FOUND)
@@ -60,20 +64,20 @@ if(zenohcxx_FOUND)
 
     target_link_libraries(zenoh_consumer_protobuf PRIVATE
         ${ZENOH_LIB}
-        common
+        rybench
     )
 
     target_link_libraries(zenoh_consumer_flatbuffers PRIVATE
         ${ZENOH_LIB}
-        common
+        rybench
     )
 
     # Include generated headers
     target_include_directories(zenoh_consumer_protobuf PRIVATE
-        ${CMAKE_BINARY_DIR}/src/common
+        ${CMAKE_BINARY_DIR}/src/rybench
     )
 
     target_include_directories(zenoh_consumer_flatbuffers PRIVATE
-        ${CMAKE_BINARY_DIR}/src/common
+        ${CMAKE_BINARY_DIR}/src/rybench
     )
 endif()

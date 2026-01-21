@@ -22,8 +22,8 @@ void Config::load(const std::string& filepath) {
         throw std::runtime_error("Failed to parse config file: " + std::string(err.what()));
     }
 
-    // Validate required sections
-    const char* requiredSections[] = {"runtime", "publisher", "generator", "schema", "dump", "serializer"};
+    // Validate required sections (transport-specific sections are optional)
+    const char* requiredSections[] = {"runtime", "generator", "schema", "serializer"};
     for (const auto& section : requiredSections) {
         if (!impl_->table.contains(section)) {
             throw std::runtime_error(std::string("Config file should have ") + section + " section");
