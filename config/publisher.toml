@@ -5,29 +5,34 @@ app_name = "benchmark_publisher"
 # Path to FlatBuffers binary schema (.bfbs)
 bfbs = "config/schemas/osi_sensorview.bfbs"
 
-[publisher]
-# type: iceoryx, zenoh
-type = "zenoh"
-service = "Benchmark"
-instance = "Default"
-event = "Data"
-max_payload_size = 4096
-rate_hz = 10
-
 [generator]
 # algorithm: fixed, schema_guided, property_guided
 algorithm = "schema_guided"
 # seed: 0 = true random, non-zero = reproducible random
 seed = 0
 # input file for replay (used with algorithm=fixed)
-replay = "dump/benchmark.bin"
+replay = "dump/benchmark-json.out"
 
 [serializer]
 # type: json, protobuf, flatbuffers
 type = "json"
 
-[dump]
-# enable recording of generated messages
-enabled = true
-# output file for dump (binary format: size + data)
-output = "dump/benchmark.bin"
+[iceoryx2]
+service = "Benchmark"
+instance = "Default"
+event = "Data"
+max_payload_size = 4096
+rate_hz = 10
+
+[zenoh]
+key_expr = "Benchmark/Default/Data"
+max_payload_size = 4096
+rate_hz = 10
+
+[filewriter]
+# output file for serialized messages (binary format: size + data)
+output = "dump/benchmark.out"
+# generation/write rate in Hz
+rate_hz = 10
+# number of messages to write (0 = unlimited, run until Ctrl+C)
+count = 0
