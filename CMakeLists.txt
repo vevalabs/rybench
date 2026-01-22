@@ -13,19 +13,17 @@ option(BUILD_ZENOH_APP "Build Zenoh publisher app" ON)
 # Find Protobuf (required for serialization)
 find_package(Protobuf REQUIRED)
 
-# Fetch RapidJSON (header-only library)
+# Fetch RapidJSON (header-only library, skip its CMakeLists.txt)
 include(FetchContent)
 FetchContent_Declare(
     rapidjson
     GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
     GIT_TAG master
+    SOURCE_SUBDIR nonexistent
 )
-FetchContent_GetProperties(rapidjson)
-if(NOT rapidjson_POPULATED)
-    FetchContent_Populate(rapidjson)
-endif()
+FetchContent_MakeAvailable(rapidjson)
 
-# Create interface library for RapidJSON (header-only, skip its CMakeLists.txt)
+# Create interface library for RapidJSON headers
 add_library(rapidjson INTERFACE)
 target_include_directories(rapidjson INTERFACE ${rapidjson_SOURCE_DIR}/include)
 
@@ -59,9 +57,13 @@ if(BUILD_ZENOH_APP)
 endif()
 
 # Iceoryx2 app
-# todo: move iceroxy2 app to project directory
 set(ICEORYX2_ROOT "$ENV{HOME}/Projects/third-party/iceoryx2")
+set(ICEORYX2_ARTIFACT_PATH "${ICEORYX2_ROOT}/target/release" CACHE PATH "Path to pre-built iceoryx2 Rust artifacts")
 if(BUILD_ICEORYX2_APP)
+    if(EXISTS "${ICEORYX2_ARTIFACT_PATH}/libiceoryx2_ffi_c.a")
+        set(RUST_BUILD_ARTIFACT_PATH ${ICEORYX2_ARTIFACT_PATH} CACHE PATH "" FORCE)
+        message(STATUS "Using pre-built iceoryx2 artifacts from: ${ICEORYX2_ARTIFACT_PATH}")
+    endif()
     add_subdirectory(
         ${ICEORYX2_ROOT}
         ${CMAKE_BINARY_DIR}/_deps/iceoryx2-build
