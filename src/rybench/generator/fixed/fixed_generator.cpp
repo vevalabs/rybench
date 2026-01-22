@@ -12,12 +12,9 @@ FixedGenerator::~FixedGenerator() {
 
 void FixedGenerator::loadSchema(const common::FlatBuffersSchema& schema) {
     schema_ = &schema;
-    // Use fixed seed for deterministic output
-    rng_.seed(42);
-    builder_ = std::make_unique<ReflectionBuilder>(schema);
 
     if (!file_.is_open()) {
-        useSchemaData_ = true;
+        throw std::runtime_error("FixedGenerator: no dump file loaded. Call loadDump() before loadSchema().");
     }
 }
 
@@ -26,17 +23,13 @@ void FixedGenerator::loadDump(const std::string& filepath) {
     if (!file_.is_open()) {
         throw std::runtime_error("Failed to open dump file: " + filepath);
     }
-    useSchemaData_ = false;
     finished_ = false;
 }
 
 common::Message FixedGenerator::generate() {
+    // If we've reached EOF, repeat the last message indefinitely
     if (finished_) {
-        return common::Message();
-    }
-
-    if (useSchemaData_) {
-        return buildFixedFromSchema();
+        return lastMessage_;
     }
 
     // Read binary FlatBuffers message from file
@@ -44,30 +37,19 @@ common::Message FixedGenerator::generate() {
     uint32_t msgSize = 0;
     if (!file_.read(reinterpret_cast<char*>(&msgSize), sizeof(msgSize))) {
         finished_ = true;
-        return common::Message();
+        // Return last cached message (repeats indefinitely)
+        return lastMessage_;
     }
 
     std::vector<uint8_t> buffer(msgSize);
     if (!file_.read(reinterpret_cast<char*>(buffer.data()), msgSize)) {
         finished_ = true;
-        return common::Message();
+        // Return last cached message (repeats indefinitely)
+        return lastMessage_;
     }
 
-    return common::Message(std::move(buffer), schema_ ? schema_->reflectionSchema() : nullptr);
-}
-
-void FixedGenerator::reset() {
-    if (file_.is_open()) {
-        file_.clear();
-        file_.seekg(0, std::ios::beg);
-    }
-    finished_ = false;
-    // Reset RNG for deterministic replay
-    rng_.seed(42);
-}
-
-bool FixedGenerator::finished() const {
-    return finished_;
+    lastMessage_ = common::Message(std::move(buffer), schema_ ? schema_->reflectionSchema() : nullptr);
+    return lastMessage_;
 }
 
 Algorithm FixedGenerator::algorithm() const {
@@ -76,13 +58,6 @@ Algorithm FixedGenerator::algorithm() const {
 
 std::string FixedGenerator::name() const {
     return "fixed";
-}
-
-common::Message FixedGenerator::buildFixedFromSchema() {
-    if (!builder_) {
-        return common::Message();
-    }
-    return builder_->build(rng_);
 }
 
 } // namespace generator
