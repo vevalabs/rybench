@@ -1,0 +1,127 @@
+#include "iceoryx2_consumer.hpp"
+
+#include <iox2/iceoryx2.hpp>
+
+#include <iostream>
+
+namespace rybench {
+
+using namespace iox2;
+
+struct Iceoryx2Consumer::Impl {
+    Node<ServiceType::Ipc> node;
+    Subscriber<ServiceType::Ipc, bb::Slice<uint8_t>, void> subscriber;
+
+    Impl(Node<ServiceType::Ipc>&& n,
+         Subscriber<ServiceType::Ipc, bb::Slice<uint8_t>, void>&& s)
+        : node(std::move(n)), subscriber(std::move(s)) {}
+};
+
+Iceoryx2Consumer::Iceoryx2Consumer() = default;
+
+Iceoryx2Consumer::~Iceoryx2Consumer() {
+    shutdown();
+}
+
+void Iceoryx2Consumer::init(const common::Config& config) {
+    // Read config from [iceoryx2] section
+    service_ = config.get("iceoryx2", "service", "Benchmark");
+    instance_ = config.get("iceoryx2", "instance", "Default");
+    event_ = config.get("iceoryx2", "event", "Data");
+    outputPath_ = config.get("iceoryx2", "output", "dump/iceoryx2-received.bin");
+
+    const std::string serviceName = service_ + "/" + instance_ + "/" + event_;
+
+    // Open output file
+    outputFile_.open(outputPath_, std::ios::binary | std::ios::trunc);
+    if (!outputFile_.is_open()) {
+        std::cerr << "[Iceoryx2] Failed to open output file: " << outputPath_ << "\n";
+        return;
+    }
+
+    // Create node
+    auto node_result = NodeBuilder{}.create<ServiceType::Ipc>();
+    if (!node_result) {
+        std::cerr << "[Iceoryx2] Failed to create node\n";
+        return;
+    }
+
+    auto node = std::move(node_result.value());
+
+    // Create service
+    auto service_name = ServiceName::create(serviceName.c_str());
+    if (!service_name) {
+        std::cerr << "[Iceoryx2] Invalid service name\n";
+        return;
+    }
+
+    auto service_result =
+        node.service_builder(service_name.value())
+            .publish_subscribe<bb::Slice<uint8_t>>()
+            .open_or_create();
+
+    if (!service_result) {
+        std::cerr << "[Iceoryx2] Failed to open/create service\n";
+        return;
+    }
+
+    auto service = std::move(service_result.value());
+
+    // Create subscriber
+    auto sub_result = service.subscriber_builder().create();
+    if (!sub_result) {
+        std::cerr << "[Iceoryx2] Failed to create subscriber\n";
+        return;
+    }
+
+    impl_ = std::make_unique<Impl>(
+        std::move(node),
+        std::move(sub_result.value())
+    );
+
+    initialized_ = true;
+
+    std::cout << "[Iceoryx2] Consumer initialized: " << serviceName << "\n";
+    std::cout << "[Iceoryx2] Writing to: " << outputPath_ << "\n";
+}
+
+void Iceoryx2Consumer::run(std::atomic<bool>& running) {
+    if (!initialized_ || !impl_) {
+        return;
+    }
+
+    constexpr auto CYCLE_TIME = bb::Duration::from_millis(10);
+
+    while (running && impl_->node.wait(CYCLE_TIME).has_value()) {
+        auto sample = impl_->subscriber.receive().value();
+        while (sample.has_value()) {
+            auto payload = sample->payload();
+
+            // Write to file: size + data
+            uint32_t msgSize = static_cast<uint32_t>(payload.number_of_elements());
+            outputFile_.write(reinterpret_cast<const char*>(&msgSize), sizeof(msgSize));
+            outputFile_.write(reinterpret_cast<const char*>(payload.data()), msgSize);
+
+            messageCount_++;
+            if (messageCount_ % 100 == 0) {
+                std::cout << "Received " << messageCount_ << " messages" << std::endl;
+            }
+
+            sample = impl_->subscriber.receive().value();
+        }
+    }
+}
+
+void Iceoryx2Consumer::shutdown() {
+    if (initialized_) {
+        impl_.reset();
+        if (outputFile_.is_open()) {
+            outputFile_.close();
+        }
+        std::cout << "[Iceoryx2] Consumer shutdown. Received " << messageCount_ << " messages.\n";
+        std::cout << "[Iceoryx2] Saved to: " << outputPath_ << "\n";
+        initialized_ = false;
+    }
+}
+
+} // namespace rybench

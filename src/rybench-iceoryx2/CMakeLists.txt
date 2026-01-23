@@ -1,6 +1,7 @@
 add_executable(rybench-iceoryx2
     main.cpp
     iceoryx2_publisher.cpp
+    iceoryx2_consumer.cpp
 )
 
 target_include_directories(rybench-iceoryx2 PRIVATE

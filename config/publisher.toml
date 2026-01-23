@@ -11,23 +11,31 @@ algorithm = "schema_guided"
 # seed: 0 = true random, non-zero = reproducible random
 seed = 0
 # input file for replay (used with algorithm=fixed)
-replay = "dump/benchmark-json.out"
+replay = "dump/benchmark-flatbuffers.out"
 
 [serializer]
 # type: json, protobuf, flatbuffers
 type = "json"
 
 [iceoryx2]
+# mode: publish or consume
+mode = "consume"
 service = "Benchmark"
 instance = "Default"
 event = "Data"
 max_payload_size = 4096
 rate_hz = 10
+# output: file path for subscribe mode (received messages)
+output = "dump/iceoryx2-received.bin"
 
 [zenoh]
+# mode: publish or consume
+mode = "publish"
 key_expr = "Benchmark/Default/Data"
 max_payload_size = 4096
 rate_hz = 10
+# output: file path for subscribe mode (received messages)
+output = "dump/zenoh-received.bin"
 
 [filewriter]
 # output file for serialized messages (binary format: size + data)

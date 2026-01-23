@@ -1,6 +1,7 @@
 add_executable(rybench-zenoh
     main.cpp
     zenoh_publisher.cpp
+    zenoh_consumer.cpp
 )
 
 target_include_directories(rybench-zenoh PRIVATE
