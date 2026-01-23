@@ -79,6 +79,3 @@ if(BUILD_ICEORYX2_APP)
     message(STATUS "Iceoryx2 app: ENABLED")
 endif()
 
-
-# Test consumers
-add_subdirectory(test)

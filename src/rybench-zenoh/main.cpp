@@ -3,6 +3,7 @@
 #include "generator_factory.hpp"
 #include "serializer_factory.hpp"
 #include "zenoh_publisher.hpp"
+#include "zenoh_consumer.hpp"
 
 #include <iostream>
 #include <thread>
@@ -11,23 +12,7 @@
 
 std::atomic<bool> running{true};
 
-int main(int argc, char* argv[]) {
-    std::string configPath = "config/publisher.toml";
-    if (argc > 1) {
-        configPath = argv[1];
-    }
-
-    rybench::common::SignalHandler::setup(running);
-
-    // Load configuration
-    rybench::common::Config config;
-    try {
-        config.load(configPath);
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to load config: " << e.what() << std::endl;
-        return 1;
-    }
-
+int runPublisher(rybench::common::Config& config) {
     // Create generator
     rybench::generator::GeneratorPtr gen;
     try {
@@ -48,7 +33,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "Serializer: " << ser->name() << std::endl;
 
-    // Create publisher (reads [zenoh] config section internally)
+    // Create publisher
     rybench::ZenohPublisher publisher;
     publisher.init(config);
 
@@ -80,4 +65,45 @@ int main(int argc, char* argv[]) {
     publisher.shutdown();
 
     return 0;
+}
+
+int runConsumer(rybench::common::Config& config) {
+    rybench::ZenohConsumer consumer;
+    consumer.init(config);
+
+    std::cout << "Waiting for messages... Press Ctrl+C to stop." << std::endl;
+
+    consumer.run(running);
+
+    std::cout << "Shutting down. Total messages: " << consumer.messageCount() << std::endl;
+    consumer.shutdown();
+
+    return 0;
+}
+
+int main(int argc, char* argv[]) {
+    std::string configPath = "config/publisher.toml";
+    if (argc > 1) {
+        configPath = argv[1];
+    }
+
+    rybench::common::SignalHandler::setup(running);
+
+    // Load configuration
+    rybench::common::Config config;
+    try {
+        config.load(configPath);
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to load config: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // Check mode: publish or subscribe
+    std::string mode = config.get("zenoh", "mode", "publish");
+
+    if (mode == "consume") {
+        return runConsumer(config);
+    } else {
+        return runPublisher(config);
+    }
 }
