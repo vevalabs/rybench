@@ -15,7 +15,7 @@ replay = "dump/benchmark-flatbuffers.out"
 
 [serializer]
 # type: json, protobuf, flatbuffers
-type = "json"
+type = "protobuf"
 
 [iceoryx2]
 # mode: publish or consume
@@ -30,7 +30,7 @@ output = "dump/iceoryx2-received.bin"
 
 [zenoh]
 # mode: publish or consume
-mode = "publish"
+mode = "consume"
 key_expr = "Benchmark/Default/Data"
 max_payload_size = 4096
 rate_hz = 10

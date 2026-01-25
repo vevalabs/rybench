@@ -1,7 +1,3 @@
-# Generate protobuf sources
-set(PROTO_FILES ${CMAKE_SOURCE_DIR}/config/protos/osi_sensorview.proto)
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
-
 # Generate FlatBuffers headers and binary schemas
 set(FBS_FILES
     ${CMAKE_SOURCE_DIR}/config/schemas/osi_sensorview.fbs
@@ -59,7 +55,6 @@ add_library(rybench STATIC
     serializer/flatbuffers/flatbuffers_serializer.cpp
     serializer/serializer_factory.cpp
     # Generated sources
-    ${PROTO_SRCS}
     ${FBS_HDRS}
     ${FBS_BFBS_FILES}
 )
