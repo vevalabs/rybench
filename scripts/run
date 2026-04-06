@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BIN_DIR="$REPO_ROOT/build/bin"
+LAUNCH="$BIN_DIR/rybench-launch"
+
+export RYBENCH_CONFIG="${RYBENCH_CONFIG:-$REPO_ROOT/config}"
+
+# ---------------------------------------------------------------------------
+# Parse arguments
+# ---------------------------------------------------------------------------
+NODES=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            echo "Usage: scripts/run [node-name...]"
+            echo ""
+            echo "  Launches node instances via rybench-launch."
+            echo "  Defaults to: iceoryx2:publisher@pub1 iceoryx2:subscriber@sub1"
+            echo ""
+            echo "  RYBENCH_CONFIG  config root directory (default: ./config)"
+            echo ""
+            echo "Examples:"
+            echo "  scripts/run"
+            echo "  scripts/run iceoryx2:publisher@pub1 iceoryx2:publisher@pub2 iceoryx2:subscriber@sub1"
+            exit 0
+            ;;
+        *) NODES+=("$1") ;;
+    esac
+    shift
+done
+
+if [[ ${#NODES[@]} -eq 0 ]]; then
+    NODES=(iceoryx2:publisher@pub1 iceoryx2:subscriber@sub1)
+fi
+
+# ---------------------------------------------------------------------------
+# Check build
+# ---------------------------------------------------------------------------
+if [[ ! -x "$LAUNCH" ]]; then
+    echo "error: $LAUNCH not found — run 'cmake --build build' first" >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Run
+# ---------------------------------------------------------------------------
+echo "RYBENCH_CONFIG=$RYBENCH_CONFIG"
+echo ""
+exec "$LAUNCH" "${NODES[@]}"

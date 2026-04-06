@@ -1,0 +1,18 @@
+[runtime]
+app_name = "benchmark_publisher_%i"
+
+[schema]
+# Path to FlatBuffers binary schema (.bfbs)
+bfbs = "schemas/osi_sensorview.bfbs"
+
+[generator]
+# algorithm: fixed, schema_guided, property_guided
+algorithm = "schema_guided"
+# seed: 0 = true random, non-zero = reproducible random
+seed = 0
+# input file for replay (used with algorithm=fixed)
+replay = "dump/benchmark-flatbuffers.out"
+
+[serializer]
+# type: json, protobuf, flatbuffers
+type = "protobuf"

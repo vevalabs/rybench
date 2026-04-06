@@ -1,10 +1,10 @@
 # Generate FlatBuffers headers and binary schemas
 set(FBS_FILES
-    ${CMAKE_SOURCE_DIR}/config/schemas/osi_sensorview.fbs
-    ${CMAKE_SOURCE_DIR}/config/schemas/benchmark.fbs
+    ${CMAKE_SOURCE_DIR}/schemas/osi_sensorview.fbs
+    ${CMAKE_SOURCE_DIR}/schemas/benchmark.fbs
 )
 set(FBS_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR})
-set(FBS_RUNTIME_DIR ${CMAKE_BINARY_DIR}/config/schemas)
+set(FBS_RUNTIME_DIR ${CMAKE_BINARY_DIR}/schemas)
 
 find_program(FLATC flatc REQUIRED)
 

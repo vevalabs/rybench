@@ -13,7 +13,7 @@ dump/*.bin
 dump/*.out
 
 # bfbs files
-config/schemas/*.bfbs
+schemas/*.bfbs
 
 # Editor backup / temp files
 ~

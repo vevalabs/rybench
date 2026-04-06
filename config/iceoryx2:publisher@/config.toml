@@ -1,0 +1,10 @@
+[iceoryx2]
+# mode: publish or consume
+mode = "publish"
+service = "Benchmark"
+instance = "Default"
+event = "Data"
+max_payload_size = 4096
+rate_hz = 10
+# output: file path for consume mode (received messages)
+output = "dump/iceoryx2-%i-received.bin"
