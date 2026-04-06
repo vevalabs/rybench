@@ -41,6 +41,9 @@ add_subdirectory(src/rybench)
 # Filewriter app (always built - no external dependencies)
 add_subdirectory(src/rybench-filewriter)
 
+# Launcher (always built - no transport dependencies)
+add_subdirectory(src/rybench-launch)
+
 # Zenoh app
 if(BUILD_ZENOH_APP)
     find_package(zenohc QUIET)

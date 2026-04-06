@@ -1,245 +1,191 @@
 # Runtime Benchmarking Framework
 
-A C++17 runtime benchmarking framework using iceoryx for real-time inter-process communication via shared memory.
+A C++17 runtime benchmarking framework for real-time inter-process communication benchmarks. Generates test data from FlatBuffers schemas and publishes via iceoryx2 or Zenoh using configurable serialization formats.
 
 ## Build
 
 ```bash
-mkdir build && cd build
-cmake ..
-#make consumer_json       # JSON consumer only
-#make consumer_protobuf   # Protobuf consumer only
-make
+cmake -S . -B build
+cmake --build build
 ```
+
+Binaries are output to `build/bin/`.
 
 ## Run
 
-Requires 3 terminals:
-
-**Terminal 1 - RouDi (iceoryx daemon):**
 ```bash
-iox-roudi
+scripts/run
 ```
 
-**Terminal 1 (2) - Zenoh (zenohd deamon):**
+This launches `publisher@pub1` and `subscriber@sub1` using the default templates under `config/`.
+
+To launch custom node sets:
+
 ```bash
-zenohd
+scripts/run publisher@pub1 publisher@pub2 subscriber@sub1
 ```
 
-**Terminal 2 - Publisher:**
-```bash
-./run/benchmark config/publisher.ini
+Press `Ctrl+C` to stop all nodes cleanly.
+
+## Configuration
+
+Configuration is organized as a directory tree under `$RYBENCH_CONFIG`:
+
+```
+config/
+├── publisher@/       # template for publisher instances
+│   └── config.toml
+└── subscriber@/      # template for subscriber instances
+    └── config.toml
 ```
 
-**Terminal 3 - Consumer:**
-```bash
-./build/test/consumer
-```
+Node names follow the systemd instance template convention:
 
-## Supported Publishers
+| Name | Resolves to |
+|------|-------------|
+| `publisher@pub1` | `config/publisher@pub1/config.toml` if it exists, otherwise `config/publisher@/config.toml` |
+| `publisher@pub2` | same template, `%i` = `pub2` |
+| `mynode` | `config/mynode/config.toml` (concrete, no template) |
 
-Configure via `[publisher] type` in the INI file:
+Inside a template, `%i` expands to the instance name and `%%` to a literal `%`.
 
-| Publisher | Config Value | Description |
-|-----------|--------------|-------------|
-| Iceoryx | `iceoryx` | Zero-copy shared memory IPC using Eclipse iceoryx (default) |
-| Zenoh | `zenoh` | Pub/sub middleware with support for various transport protocols |
+### config.toml fields
 
-## Supported Serializers
+```toml
+[runtime]
+app_name  = "benchmark_publisher_%i"   # %i = instance name
+transport = "iceoryx2"                  # iceoryx2 | zenoh | filewriter
 
-Configure via `[serializer] type` in the INI file:
-
-| Serializer | Config Value | Description |
-|------------|--------------|-------------|
-| JSON | `json` | Human-readable JSON format using nlohmann/json (default) |
-| Protobuf | `protobuf` | Binary Protocol Buffers format, supports OSI schemas |
-| FlatBuffers | `flatbuffers` | Zero-copy binary format for high performance |
-
-### Protobuf Options
-
-- `proto_message` - Message type to use (e.g., `osi::SensorViewMessage`)
-
-### FlatBuffers Options
-
-- `fbs_message` - Message type to use (e.g., `osi::SensorViewMessage`)
-
-### Schema Configuration
-
-All serializers use FlatBuffers binary schema (.bfbs) for field constraints. Configure the schema path in the `[schema]` section:
-
-```ini
 [schema]
-bfbs = config/flatbuffers/osi_sensorview.bfbs
+bfbs = "schemas/osi_sensorview.bfbs"   # FlatBuffers binary schema
+
+[generator]
+algorithm = "schema_guided"             # fixed | schema_guided | property_guided
+seed      = 0                           # 0 = random, non-zero = reproducible
+replay    = "dump/benchmark.out"        # used with algorithm=fixed
+
+[serializer]
+type = "protobuf"                       # json | protobuf | flatbuffers
+
+[iceoryx2]
+mode             = "publish"            # publish | consume
+service          = "Benchmark"
+instance         = "Default"
+event            = "Data"
+max_payload_size = 4096
+rate_hz          = 10
+output           = "dump/iceoryx2-%i-received.bin"   # consume mode only
+
+[zenoh]
+mode             = "consume"            # publish | consume
+key_expr         = "Benchmark/Default/Data"
+max_payload_size = 4096
+rate_hz          = 10
+output           = "dump/zenoh-%i-received.bin"      # consume mode only
+
+[filewriter]
+output  = "dump/benchmark-%i.out"
+rate_hz = 10
+count   = 0                             # 0 = unlimited
 ```
 
-The constraints are defined as attributes in the `.fbs` source file and compiled to `.bfbs`:
+### Per-instance overrides
+
+Place a concrete config at `config/<name>/config.toml` to override the template for that instance only. Any key present in the concrete config takes priority; missing keys fall back to the template.
+
+## Transports
+
+| Transport | Binary | Daemon required |
+|-----------|--------|-----------------|
+| `iceoryx2` | `rybench-iceoryx2` | None |
+| `zenoh` | `rybench-zenoh` | None (local); `zenohd` for cross-machine routing |
+| `filewriter` | `rybench-filewriter` | None |
+
+## Serializers
+
+| Value | Format |
+|-------|--------|
+| `json` | Human-readable JSON via FlatBuffers reflection |
+| `protobuf` | Protocol Buffers, dynamically generated from `.bfbs` schema |
+| `flatbuffers` | FlatBuffers pass-through |
+
+## Generators
+
+| Value | Description |
+|-------|-------------|
+| `schema_guided` | Random data within constraints defined in `.fbs` attributes |
+| `property_guided` | Custom per-field generators (counter, timestamp, cycle) |
+| `fixed` | Replay from a recorded binary file (`replay` path) |
+
+### Schema constraints
+
+Constraints are declared as attributes in the `.fbs` source and compiled to `.bfbs`:
 
 ```flatbuffers
-attribute "min";
-attribute "max";
-attribute "min_length";
-attribute "max_length";
-attribute "min_items";
-attribute "max_items";
+attribute "min";        attribute "max";
+attribute "min_length"; attribute "max_length";
+attribute "min_items";  attribute "max_items";
 
 table SensorViewMessage {
-    sensor_id: uint64 (min: "1", max: "100");
-    sensor_name: string (min_length: "5", max_length: "20");
+    sensor_id:     uint64 (min: "1",  max: "100");
+    sensor_name:   string (min_length: "5", max_length: "20");
     moving_object: [MovingObject] (min_items: "1", max_items: "10");
 }
 ```
 
-Compile the schema with: `flatc --binary --schema -o config/flatbuffers config/flatbuffers/osi_sensorview.fbs`
+Compile with:
 
-### Available Proto Messages
-
-| Message | Description |
-|---------|-------------|
-| `osi::SensorViewMessage` | OSI sensor view with timestamp, objects, sensor info |
-| `osi::MovingObject` | Single moving object with position, velocity, type |
-| `osi::Timestamp` | Time representation (seconds + nanos) |
-| `osi::Vector3d` | 3D vector (x, y, z) |
-
-To add new proto messages:
-1. Add `.proto` file to `config/protos/`
-2. Update `CMakeLists.txt` to include the proto file
-3. Register message in `protobuf_serializer.cpp` using `REGISTER_PROTO_MESSAGE()`
-
-## Supported Algorithms
-
-Configure via `[generator] algorithm` in the INI file:
-
-| Algorithm | Config Value | Description |
-|-----------|--------------|-------------|
-| Fixed | `fixed` | Reads messages from a JSONL file and replays them sequentially. |
-| Schema-Guided | `schema_guided` | Random data within schema constraints (default). |
-| Property-Guided | `property_guided` | Custom generators for fields (counters, timestamps, cycles). |
-
-### Algorithm Options
-
-**fixed:**
-- `replay` - Path to JSONL file containing messages to replay
-
-**schema_guided:**
-- `seed` - RNG seed (0 = true random, non-zero = reproducible)
-
-## Schema Format
-
-Schemas are FlatBuffers files (.fbs) defining the message structure. Place in `config/flatbuffers/`.
-
-### Supported Constraint Attributes
-
-| Attribute | Applies To | Description |
-|-----------|------------|-------------|
-| `min` | numeric types | Minimum value |
-| `max` | numeric types | Maximum value |
-| `min_length` | string | Minimum string length |
-| `max_length` | string | Maximum string length |
-| `min_items` | vector | Minimum array size |
-| `max_items` | vector | Maximum array size |
-
-### Example Schema
-
-```flatbuffers
-namespace benchmark;
-
-attribute "min";
-attribute "max";
-attribute "min_length";
-attribute "max_length";
-attribute "min_items";
-attribute "max_items";
-
-table Measurement {
-    value: double (min: "-100.0", max: "100.0");
-}
-
-table BenchmarkMessage {
-    timestamp: uint64 (min: "0", max: "9999999999");
-    value: double (min: "0.0", max: "100.0");
-    label: string (min_length: "5", max_length: "20");
-    active: bool;
-    measurements: [Measurement] (min_items: "1", max_items: "5");
-}
-
-root_type BenchmarkMessage;
+```bash
+flatc --binary --schema -o schemas/ schemas/osi_sensorview.fbs
 ```
 
-## Configuration
+## Binaries
 
-Example `config/publisher.ini`:
+| Binary | Description |
+|--------|-------------|
+| `rybench-launch` | Launches multiple node instances from the CLI |
+| `rybench-iceoryx2` | Iceoryx2 publisher or consumer (zero-copy shared memory) |
+| `rybench-zenoh` | Zenoh publisher or consumer |
+| `rybench-filewriter` | Writes serialized messages to a binary file |
 
-```ini
-[runtime]
-app_name = publisher
+Each transport binary can also be invoked directly (`$RYBENCH_CONFIG` must be set):
 
-[schema]
-bfbs = config/flatbuffers/benchmark.bfbs
-
-[publisher]
-type = iceoryx
-service = Benchmark
-instance = Instance
-event = Event
-max_payload_size = 4096
-rate_hz = 10
-
-[generator]
-algorithm = schema_guided
-seed = 42
-
-[serializer]
-type = json
-proto_message = osi::SensorViewMessage
-
-[dump]
-enabled = false
-output = dump/benchmark.bin
+```bash
+export RYBENCH_CONFIG=$PWD/config
+./build/bin/rybench-iceoryx2 publisher@pub1
 ```
+
+## Dependencies
+
+Install on Fedora:
+
+```bash
+sudo dnf install protobuf-devel protobuf-compiler flatbuffers-devel flatbuffers-compiler
+# Optional for Zenoh:
+sudo dnf install zenoh-cpp-devel
+```
+
+- GCC with C++17 support
+- CMake >= 3.16
+- iceoryx2 (built from source, see `CMakeLists.txt`)
+- rapidjson (fetched automatically via CMake FetchContent)
+- toml++ (fetched automatically via CMake FetchContent)
+- protobuf
+- flatbuffers
+- zenoh-cpp (optional, auto-detected)
 
 ## Commit Convention
 
-Follow this commit message format:
-
 ```
 <type>(<scope>): <description>
-
-[optional body]
 ```
-
-### Types
 
 | Type | Description |
 |------|-------------|
 | `feat` | New feature |
 | `fix` | Bug fix |
-| `refactor` | Code refactoring (no feature change) |
+| `refactor` | Code refactoring |
 | `docs` | Documentation only |
 | `test` | Adding or updating tests |
 | `chore` | Build, config, or tooling changes |
 | `perf` | Performance improvement |
-
-
----
-
-## Dependencies
-
-- GCC with C++17 support
-- iceoryx (iceoryx_posh, iceoryx_hoofs)
-- nlohmann/json
-- protobuf
-- flatbuffers
-- zenoh-cpp (optional, for Zenoh publisher)
-
-
-Install on Fedora:
-```bash
-sudo dnf install nlohmann-json-devel iceoryx-devel protobuf-devel protobuf-compiler flatbuffers-devel flatbuffers-compiler
-
-
-curl -LO https://github.com/eclipse-zenoh/zenoh/releases/download/1.7.1/zenoh-1.7.1-x86_64-unknown-linux-gnu-standalone.zip
-unzip zenoh-1.7.1-x86_64-unknown-linux-gnu-standalone.zip -d zenoh-1.7.1
-
-# Add zenoh client lib
-
-```

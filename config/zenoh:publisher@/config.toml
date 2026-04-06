@@ -1,0 +1,12 @@
+[serializer]
+# override: zenoh benchmarks use json by default
+type = "json"
+
+[zenoh]
+# mode: publish or consume
+mode = "publish"
+key_expr = "Benchmark/Default/Data"
+max_payload_size = 4096
+rate_hz = 10
+# output: file path for consume mode (received messages)
+output = "dump/zenoh-%i-published.bin"

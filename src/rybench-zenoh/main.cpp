@@ -82,17 +82,23 @@ int runConsumer(rybench::common::Config& config) {
 }
 
 int main(int argc, char* argv[]) {
-    std::string configPath = "config/publisher.toml";
-    if (argc > 1) {
-        configPath = argv[1];
+    if (argc < 2) {
+        std::cerr << "Usage: rybench-zenoh <node-name>  (e.g. publisher@pub1)\n"
+                  << "  $RYBENCH_CONFIG must point to the config root directory.\n";
+        return 1;
     }
 
     rybench::common::SignalHandler::setup(running);
 
-    // Load configuration
+    const char* configRoot = std::getenv("RYBENCH_CONFIG");
+    if (!configRoot) {
+        std::cerr << "$RYBENCH_CONFIG is not set\n";
+        return 1;
+    }
+
     rybench::common::Config config;
     try {
-        config.load(configPath);
+        config.loadNode(configRoot, argv[1]);
     } catch (const std::exception& e) {
         std::cerr << "Failed to load config: " << e.what() << std::endl;
         return 1;

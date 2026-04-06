@@ -14,7 +14,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
 
-    void load(const std::string& filepath);
+    // Resolve and load a node config under configRoot using the systemd-style
+    // template convention:
+    //   nodeName = "foo"        → configRoot/foo/config.toml      (concrete)
+    //                             configRoot/foo@/config.toml     (template fallback, %i = "")
+    //   nodeName = "foo@bar"    → configRoot/foo@bar/config.toml  (concrete)
+    //                             configRoot/foo@/config.toml     (template fallback, %i = "bar")
+    // Inside a template, %i expands to the instance name.
+    void loadNode(const std::string& configRoot, const std::string& nodeName);
 
     std::string get(const std::string& section, const std::string& key,
                     const std::string& defaultValue = "") const;
@@ -26,11 +33,17 @@ public:
     bool hasKey(const std::string& section, const std::string& key) const;
 
     const FlatBuffersSchema& schema() const { return schema_; }
+    const std::string& instanceName() const { return instanceName_; }
 
 private:
+    void load(const std::string& filepath);
+    void validate();
+    std::string expandSpecifiers(const std::string& value) const;
+
     struct Impl;
     std::unique_ptr<Impl> impl_;
     FlatBuffersSchema schema_;
+    std::string instanceName_;
 };
 
 } // namespace common
