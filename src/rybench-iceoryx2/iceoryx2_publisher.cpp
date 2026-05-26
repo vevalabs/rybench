@@ -7,14 +7,12 @@
 
 namespace rybench {
 
-using namespace iox2;
-
 struct Iceoryx2Publisher::Impl {
-    Node<ServiceType::Ipc> node;
-    Publisher<ServiceType::Ipc, bb::Slice<uint8_t>, void> publisher;
+    iox2::Node<iox2::ServiceType::Ipc> node;
+    iox2::Publisher<iox2::ServiceType::Ipc, iox2::bb::Slice<uint8_t>, void> publisher;
 
-    Impl(Node<ServiceType::Ipc>&& n,
-         Publisher<ServiceType::Ipc, bb::Slice<uint8_t>, void>&& p)
+    Impl(iox2::Node<iox2::ServiceType::Ipc>&& n,
+         iox2::Publisher<iox2::ServiceType::Ipc, iox2::bb::Slice<uint8_t>, void>&& p)
         : node(std::move(n)), publisher(std::move(p)) {}
 };
 
@@ -35,7 +33,7 @@ void Iceoryx2Publisher::init(const common::Config& config) {
     const std::string serviceName = service_ + "/" + instance_ + "/" + event_;
 
     // Create node
-    auto node_result = NodeBuilder{}.create<ServiceType::Ipc>();
+    auto node_result = iox2::NodeBuilder{}.create<iox2::ServiceType::Ipc>();
     if (!node_result) {
         std::cerr << "[Iceoryx2] Failed to create node\n";
         return;
@@ -44,7 +42,7 @@ void Iceoryx2Publisher::init(const common::Config& config) {
     auto node = std::move(node_result.value());
 
     // Create service
-    auto service_name = ServiceName::create(serviceName.c_str());
+    auto service_name = iox2::ServiceName::create(serviceName.c_str());
     if (!service_name) {
         std::cerr << "[Iceoryx2] Invalid service name\n";
         return;
@@ -52,7 +50,7 @@ void Iceoryx2Publisher::init(const common::Config& config) {
 
     auto service_result =
         node.service_builder(service_name.value())
-            .publish_subscribe<bb::Slice<uint8_t>>()
+            .publish_subscribe<iox2::bb::Slice<uint8_t>>()
             .open_or_create();
 
     if (!service_result) {

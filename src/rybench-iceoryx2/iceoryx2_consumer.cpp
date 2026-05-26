@@ -6,14 +6,13 @@
 
 namespace rybench {
 
-using namespace iox2;
 
 struct Iceoryx2Consumer::Impl {
-    Node<ServiceType::Ipc> node;
-    Subscriber<ServiceType::Ipc, bb::Slice<uint8_t>, void> subscriber;
+    iox2::Node<iox2::ServiceType::Ipc> node;
+    iox2::Subscriber<iox2::ServiceType::Ipc, iox2::bb::Slice<uint8_t>, void> subscriber;
 
-    Impl(Node<ServiceType::Ipc>&& n,
-         Subscriber<ServiceType::Ipc, bb::Slice<uint8_t>, void>&& s)
+    Impl(iox2::Node<iox2::ServiceType::Ipc>&& n,
+         iox2::Subscriber<iox2::ServiceType::Ipc, iox2::bb::Slice<uint8_t>, void>&& s)
         : node(std::move(n)), subscriber(std::move(s)) {}
 };
 
@@ -40,7 +39,7 @@ void Iceoryx2Consumer::init(const common::Config& config) {
     }
 
     // Create node
-    auto node_result = NodeBuilder{}.create<ServiceType::Ipc>();
+    auto node_result = iox2::NodeBuilder{}.create<iox2::ServiceType::Ipc>();
     if (!node_result) {
         std::cerr << "[Iceoryx2] Failed to create node\n";
         return;
@@ -49,7 +48,7 @@ void Iceoryx2Consumer::init(const common::Config& config) {
     auto node = std::move(node_result.value());
 
     // Create service
-    auto service_name = ServiceName::create(serviceName.c_str());
+    auto service_name = iox2::ServiceName::create(serviceName.c_str());
     if (!service_name) {
         std::cerr << "[Iceoryx2] Invalid service name\n";
         return;
@@ -57,7 +56,7 @@ void Iceoryx2Consumer::init(const common::Config& config) {
 
     auto service_result =
         node.service_builder(service_name.value())
-            .publish_subscribe<bb::Slice<uint8_t>>()
+            .publish_subscribe<iox2::bb::Slice<uint8_t>>()
             .open_or_create();
 
     if (!service_result) {
@@ -90,7 +89,7 @@ void Iceoryx2Consumer::run(std::atomic<bool>& running) {
         return;
     }
 
-    constexpr auto CYCLE_TIME = bb::Duration::from_millis(10);
+    constexpr auto CYCLE_TIME = iox2::bb::Duration::from_millis(10);
 
     while (running && impl_->node.wait(CYCLE_TIME).has_value()) {
         auto sample = impl_->subscriber.receive().value();
