@@ -5,10 +5,8 @@
 #include <expected>
 #include <string>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 std::expected<GeneratorPtr, std::string> createGenerator(const common::Config& config);
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

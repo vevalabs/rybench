@@ -5,8 +5,7 @@
 #include <iostream>
 #include <filesystem>
 
-namespace rybench {
-namespace common {
+namespace rybench::common {
 
 struct Config::Impl {
     toml::table table;
@@ -157,5 +156,4 @@ bool Config::hasKey(const std::string& section, const std::string& key) const {
     return false;
 }
 
-} // namespace common
-} // namespace rybench
+} // namespace rybench::common

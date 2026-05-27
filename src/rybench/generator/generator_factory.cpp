@@ -1,12 +1,11 @@
 #include <rybench/generator/generator_factory.hpp>
-#include "fixed/include/fixed_generator.hpp"
-#include "schema_guided/include/schema_guided_generator.hpp"
-#include "property_guided/include/property_guided_generator.hpp"
+#include "fixed/fixed_generator.hpp"
+#include "schema_guided/schema_guided_generator.hpp"
+#include "property_guided/property_guided_generator.hpp"
 
 #include <iostream>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 std::expected<GeneratorPtr, std::string> createGenerator(const common::Config& config) {
     try {
@@ -49,5 +48,4 @@ std::expected<GeneratorPtr, std::string> createGenerator(const common::Config& c
     }
 }
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

@@ -5,8 +5,7 @@
 #include <memory>
 #include <string>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 class Generator {
 public:
@@ -19,5 +18,4 @@ public:
 
 using GeneratorPtr = std::unique_ptr<Generator>;
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

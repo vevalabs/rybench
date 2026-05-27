@@ -1,8 +1,7 @@
 #include "property_guided_generator.hpp"
 #include <chrono>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 PropertyGuidedGenerator::PropertyGuidedGenerator()
     : rng_(std::chrono::steady_clock::now().time_since_epoch().count()) {}
@@ -77,5 +76,4 @@ std::string PropertyGuidedGenerator::name() const {
     return "property_guided";
 }
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

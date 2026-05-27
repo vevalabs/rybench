@@ -3,8 +3,7 @@
 #include <cctype>
 #include <iostream>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 ProtobufSerializer::ProtobufSerializer(const std::string& bfbsPath)
     : factory_(&pool_) {
@@ -397,5 +396,4 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
     }
 }
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

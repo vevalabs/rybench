@@ -4,8 +4,7 @@
 #include <fstream>
 #include <string>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 class FixedGenerator : public Generator {
 public:
@@ -24,5 +23,4 @@ private:
     common::Message lastMessage_;  // Cached for indefinite replay
 };
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

@@ -12,8 +12,7 @@
 #include <memory>
 #include <string>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 class ProtobufSerializer : public Serializer {
 public:
@@ -50,5 +49,4 @@ private:
                                      const reflection::Field* fbField) const;
 };
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

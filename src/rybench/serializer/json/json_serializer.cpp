@@ -2,8 +2,7 @@
 #include <flatbuffers/flatbuffers.h>
 #include <iostream>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 JsonSerializer::JsonSerializer(const std::string& bfbsPath) {
     if (!bfbsPath.empty()) {
@@ -186,5 +185,4 @@ void JsonSerializer::valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& wri
     }
 }
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

@@ -3,8 +3,7 @@
 #include <algorithm>
 #include <cstring>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 ReflectionBuilder::ReflectionBuilder(const common::FlatBuffersSchema& schema)
     : schema_(schema) {}
@@ -512,5 +511,4 @@ std::string ReflectionBuilder::fieldPath(const std::string& basePath, const std:
     return basePath + "." + fieldName;
 }
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

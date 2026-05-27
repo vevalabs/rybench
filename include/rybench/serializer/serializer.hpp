@@ -6,8 +6,7 @@
 #include <memory>
 #include <string>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 class Serializer {
 public:
@@ -19,5 +18,4 @@ public:
 
 using SerializerPtr = std::unique_ptr<Serializer>;
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

@@ -1,12 +1,11 @@
 #include <rybench/serializer/serializer_factory.hpp>
-#include "json_serializer.hpp"
-#include "protobuf_serializer.hpp"
-#include "flatbuffers_serializer.hpp"
+#include "json/json_serializer.hpp"
+#include "protobuf/protobuf_serializer.hpp"
+#include "flatbuffers/flatbuffers_serializer.hpp"
 
 #include <iostream>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 std::expected<SerializerPtr, std::string> createSerializer(const common::Config& config) {
     try {
@@ -29,5 +28,4 @@ std::expected<SerializerPtr, std::string> createSerializer(const common::Config&
     }
 }
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

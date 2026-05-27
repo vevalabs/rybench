@@ -8,8 +8,7 @@
 #include <vector>
 #include <memory>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 class PropertyGuidedGenerator : public Generator {
 public:
@@ -66,5 +65,4 @@ private:
     std::unique_ptr<ReflectionBuilder> builder_;
 };
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

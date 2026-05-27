@@ -1,8 +1,7 @@
 #include <rybench/common/message.hpp>
 #include <flatbuffers/flatbuffers.h>
 
-namespace rybench {
-namespace common {
+namespace rybench::common {
 
 Message::Message(std::vector<uint8_t> buffer)
     : buffer_(std::move(buffer)) {}
@@ -49,5 +48,4 @@ std::string Message::toJson() const {
     return "{\"size\": " + std::to_string(buffer_.size()) + "}";
 }
 
-} // namespace common
-} // namespace rybench
+} // namespace rybench::common

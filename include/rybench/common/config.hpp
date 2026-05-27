@@ -4,8 +4,7 @@
 #include <string>
 #include <memory>
 
-namespace rybench {
-namespace common {
+namespace rybench::common {
 
 class Config {
 public:
@@ -46,5 +45,4 @@ private:
     std::string instanceName_;
 };
 
-} // namespace common
-} // namespace rybench
+} // namespace rybench::common

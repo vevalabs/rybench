@@ -5,10 +5,8 @@
 #include <expected>
 #include <string>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 std::expected<SerializerPtr, std::string> createSerializer(const common::Config& config);
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

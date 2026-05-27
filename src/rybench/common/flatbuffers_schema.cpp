@@ -3,8 +3,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-namespace rybench {
-namespace common {
+namespace rybench::common {
 
 void FlatBuffersSchema::loadFromBfbs(const std::string& filepath) {
     std::ifstream file(filepath, std::ios::binary | std::ios::ate);
@@ -194,5 +193,4 @@ FbsFieldType FlatBuffersSchema::baseTypeToFieldType(reflection::BaseType baseTyp
     }
 }
 
-} // namespace common
-} // namespace rybench
+} // namespace rybench::common

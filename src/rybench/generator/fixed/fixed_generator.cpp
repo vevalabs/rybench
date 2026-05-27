@@ -1,8 +1,7 @@
 #include "fixed_generator.hpp"
 #include <stdexcept>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 FixedGenerator::~FixedGenerator() {
     if (file_.is_open()) {
@@ -56,5 +55,4 @@ std::string FixedGenerator::name() const {
     return "fixed";
 }
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

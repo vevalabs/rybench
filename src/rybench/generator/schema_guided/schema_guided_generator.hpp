@@ -6,8 +6,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 class SchemaGuidedGenerator : public Generator {
 public:
@@ -25,5 +24,4 @@ private:
 
 using RandomGenerator = SchemaGuidedGenerator;
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

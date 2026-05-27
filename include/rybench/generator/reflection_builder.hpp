@@ -9,8 +9,7 @@
 #include <unordered_map>
 #include <regex>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 class ReflectionBuilder {
 public:
@@ -86,5 +85,4 @@ private:
     std::string fieldPath(const std::string& basePath, const std::string& fieldName) const;
 };
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

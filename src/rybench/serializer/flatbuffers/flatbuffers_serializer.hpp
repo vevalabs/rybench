@@ -5,8 +5,7 @@
 #include <flatbuffers/reflection.h>
 #include <string>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 class FlatbuffersSerializer : public Serializer {
 public:
@@ -19,5 +18,4 @@ private:
     std::vector<uint8_t> buffer_;
 };
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

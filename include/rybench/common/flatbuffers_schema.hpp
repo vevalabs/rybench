@@ -6,8 +6,7 @@
 #include <cstdint>
 #include <flatbuffers/reflection.h>
 
-namespace rybench {
-namespace common {
+namespace rybench::common {
 
 enum class FbsFieldType {
     Bool,
@@ -90,5 +89,4 @@ private:
     static FbsFieldType baseTypeToFieldType(reflection::BaseType baseType);
 };
 
-} // namespace common
-} // namespace rybench
+} // namespace rybench::common

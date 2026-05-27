@@ -6,8 +6,7 @@
 #include <rapidjson/stringbuffer.h>
 #include <string>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 class JsonSerializer : public Serializer {
 public:
@@ -26,5 +25,4 @@ private:
     void valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const reflection::Field* field, const flatbuffers::Table* table);
 };
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer
