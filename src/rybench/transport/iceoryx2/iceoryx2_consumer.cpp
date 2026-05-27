@@ -22,8 +22,7 @@ Iceoryx2Consumer::~Iceoryx2Consumer() {
     shutdown();
 }
 
-void Iceoryx2Consumer::init(const common::Config& config) {
-    // Read config from [iceoryx2] section
+std::expected<void, std::string> Iceoryx2Consumer::init(const common::Config& config) {
     service_ = config.get("iceoryx2", "service", "Benchmark");
     instance_ = config.get("iceoryx2", "instance", "Default");
     event_ = config.get("iceoryx2", "event", "Data");
@@ -31,57 +30,36 @@ void Iceoryx2Consumer::init(const common::Config& config) {
 
     const std::string serviceName = service_ + "/" + instance_ + "/" + event_;
 
-    // Open output file
     outputFile_.open(outputPath_, std::ios::binary | std::ios::trunc);
-    if (!outputFile_.is_open()) {
-        std::cerr << "[Iceoryx2] Failed to open output file: " << outputPath_ << "\n";
-        return;
-    }
+    if (!outputFile_.is_open())
+        return std::unexpected("[Iceoryx2] Failed to open output file: " + outputPath_);
 
-    // Create node
     auto node_result = iox2::NodeBuilder{}.create<iox2::ServiceType::Ipc>();
-    if (!node_result) {
-        std::cerr << "[Iceoryx2] Failed to create node\n";
-        return;
-    }
+    if (!node_result) return std::unexpected("[Iceoryx2] Failed to create node");
 
     auto node = std::move(node_result.value());
 
-    // Create service
     auto service_name = iox2::ServiceName::create(serviceName.c_str());
-    if (!service_name) {
-        std::cerr << "[Iceoryx2] Invalid service name\n";
-        return;
-    }
+    if (!service_name) return std::unexpected("[Iceoryx2] Invalid service name: " + serviceName);
 
     auto service_result =
         node.service_builder(service_name.value())
             .publish_subscribe<iox2::bb::Slice<uint8_t>>()
             .open_or_create();
 
-    if (!service_result) {
-        std::cerr << "[Iceoryx2] Failed to open/create service\n";
-        return;
-    }
+    if (!service_result) return std::unexpected("[Iceoryx2] Failed to open/create service: " + serviceName);
 
     auto service = std::move(service_result.value());
 
-    // Create subscriber
     auto sub_result = service.subscriber_builder().create();
-    if (!sub_result) {
-        std::cerr << "[Iceoryx2] Failed to create subscriber\n";
-        return;
-    }
+    if (!sub_result) return std::unexpected("[Iceoryx2] Failed to create subscriber");
 
-    impl_ = std::make_unique<Impl>(
-        std::move(node),
-        std::move(sub_result.value())
-    );
-
+    impl_ = std::make_unique<Impl>(std::move(node), std::move(sub_result.value()));
     initialized_ = true;
 
     std::cout << "[Iceoryx2] Consumer initialized: " << serviceName << "\n";
     std::cout << "[Iceoryx2] Writing to: " << outputPath_ << "\n";
+    return {};
 }
 
 void Iceoryx2Consumer::run(std::atomic<bool>& running) {

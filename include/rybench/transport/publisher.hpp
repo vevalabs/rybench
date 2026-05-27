@@ -1,5 +1,7 @@
 #pragma once
 #include <rybench/common/config.hpp>
+#include <expected>
+#include <string>
 #include <cstddef>
 
 namespace rybench::transport {
@@ -7,7 +9,7 @@ namespace rybench::transport {
 class Publisher {
 public:
     virtual ~Publisher() = default;
-    virtual void init(const common::Config& config) = 0;
+    virtual std::expected<void, std::string> init(const common::Config& config) = 0;
     virtual bool publish(const void* data, std::size_t size) = 0;
     virtual void shutdown() = 0;
     virtual int rateHz() const = 0;

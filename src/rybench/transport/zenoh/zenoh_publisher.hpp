@@ -18,7 +18,7 @@ public:
     ZenohPublisher();
     ~ZenohPublisher();
 
-    void init(const common::Config& config) override;
+    std::expected<void, std::string> init(const common::Config& config) override;
     bool publish(const void* data, std::size_t size) override;
     void shutdown() override;
     int rateHz() const override { return rateHz_; }

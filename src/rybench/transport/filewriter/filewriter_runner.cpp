@@ -10,22 +10,20 @@
 namespace rybench::transport::filewriter {
 
 int run(const common::Config& config, std::atomic<bool>& running) {
-    rybench::generator::GeneratorPtr gen;
-    try {
-        gen = rybench::generator::createGenerator(config);
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to create generator: " << e.what() << "\n";
+    auto genResult = rybench::generator::createGenerator(config);
+    if (!genResult) {
+        std::cerr << "Failed to create generator: " << genResult.error() << "\n";
         return 1;
     }
+    auto gen = std::move(*genResult);
     std::cout << "Generator: " << gen->name() << "\n";
 
-    rybench::serializer::SerializerPtr ser;
-    try {
-        ser = rybench::serializer::createSerializer(config);
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to create serializer: " << e.what() << "\n";
+    auto serResult = rybench::serializer::createSerializer(config);
+    if (!serResult) {
+        std::cerr << "Failed to create serializer: " << serResult.error() << "\n";
         return 1;
     }
+    auto ser = std::move(*serResult);
     std::cout << "Serializer: " << ser->name() << "\n";
 
     std::string outputPath = config.get("filewriter", "output", "dump/benchmark.bin");

@@ -23,40 +23,33 @@ ZenohConsumer::~ZenohConsumer() {
     shutdown();
 }
 
-void ZenohConsumer::init(const common::Config& config) {
-    // Read config from [zenoh] section
+std::expected<void, std::string> ZenohConsumer::init(const common::Config& config) {
     keyExpr_ = config.get("zenoh", "key_expr", "Benchmark/Default/Data");
     outputPath_ = config.get("zenoh", "output", "dump/zenoh-received.bin");
 
-    // Open output file
     outputFile_.open(outputPath_, std::ios::binary | std::ios::trunc);
-    if (!outputFile_.is_open()) {
-        std::cerr << "[Zenoh] Failed to open output file: " << outputPath_ << "\n";
-        return;
-    }
+    if (!outputFile_.is_open())
+        return std::unexpected("[Zenoh] Failed to open output file: " + outputPath_);
 
     try {
-        // Open Zenoh session
         ::zenoh::Config zconfig = ::zenoh::Config::create_default();
         auto session = ::zenoh::Session::open(std::move(zconfig));
 
         impl_ = std::make_unique<Impl>(std::move(session));
 
-        // Create subscriber with callback
         auto callback = [this](::zenoh::Sample& sample) {
             const auto& payload = sample.get_payload();
             auto data = payload.as_vector();
 
             std::lock_guard<std::mutex> lock(impl_->fileMutex);
 
-            // Write to file: size + data
             uint32_t msgSize = static_cast<uint32_t>(data.size());
             outputFile_.write(reinterpret_cast<const char*>(&msgSize), sizeof(msgSize));
             outputFile_.write(reinterpret_cast<const char*>(data.data()), msgSize);
 
             messageCount_++;
             if (messageCount_ % 100 == 0) {
-                std::cout << "Received " << messageCount_.load() << " messages" << std::endl;
+                std::cout << "Received " << messageCount_.load() << " messages\n";
             }
         };
 
@@ -70,9 +63,9 @@ void ZenohConsumer::init(const common::Config& config) {
 
         std::cout << "[Zenoh] Consumer initialized: " << keyExpr_ << "\n";
         std::cout << "[Zenoh] Writing to: " << outputPath_ << "\n";
-
+        return {};
     } catch (const std::exception& e) {
-        std::cerr << "[Zenoh] Failed to initialize: " << e.what() << std::endl;
+        return std::unexpected(std::string("[Zenoh] Failed to initialize: ") + e.what());
     }
 }
 

@@ -11,26 +11,27 @@
 namespace rybench::transport::iceoryx2 {
 
 static int runPublisher(const common::Config& config, std::atomic<bool>& running) {
-    rybench::generator::GeneratorPtr gen;
-    try {
-        gen = rybench::generator::createGenerator(config);
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to create generator: " << e.what() << "\n";
+    auto genResult = rybench::generator::createGenerator(config);
+    if (!genResult) {
+        std::cerr << "Failed to create generator: " << genResult.error() << "\n";
         return 1;
     }
+    auto gen = std::move(*genResult);
     std::cout << "Generator: " << gen->name() << "\n";
 
-    rybench::serializer::SerializerPtr ser;
-    try {
-        ser = rybench::serializer::createSerializer(config);
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to create serializer: " << e.what() << "\n";
+    auto serResult = rybench::serializer::createSerializer(config);
+    if (!serResult) {
+        std::cerr << "Failed to create serializer: " << serResult.error() << "\n";
         return 1;
     }
+    auto ser = std::move(*serResult);
     std::cout << "Serializer: " << ser->name() << "\n";
 
     Iceoryx2Publisher publisher;
-    publisher.init(config);
+    if (auto result = publisher.init(config); !result) {
+        std::cerr << result.error() << "\n";
+        return 1;
+    }
 
     auto interval = std::chrono::milliseconds(1000 / publisher.rateHz());
     std::cout << "Started. Rate: " << publisher.rateHz() << " Hz. Press Ctrl+C to stop.\n";
@@ -58,7 +59,10 @@ static int runPublisher(const common::Config& config, std::atomic<bool>& running
 
 static int runConsumer(const common::Config& config, std::atomic<bool>& running) {
     Iceoryx2Consumer consumer;
-    consumer.init(config);
+    if (auto result = consumer.init(config); !result) {
+        std::cerr << result.error() << "\n";
+        return 1;
+    }
     std::cout << "Waiting for messages... Press Ctrl+C to stop.\n";
     consumer.run(running);
     std::cout << "Shutting down. Total messages: " << consumer.messageCount() << "\n";

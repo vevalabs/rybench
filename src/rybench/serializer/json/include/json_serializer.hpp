@@ -13,11 +13,12 @@ class JsonSerializer : public Serializer {
 public:
     explicit JsonSerializer(const std::string& bfbsPath = "");
 
-    std::vector<uint8_t> serialize(const common::Message& msg) override;
+    std::span<const uint8_t> serialize(const common::Message& msg) override;
     std::string name() const override;
 
 private:
     common::FlatBuffersSchema fbsSchema_;
+    std::vector<uint8_t> buffer_;
 
     // FlatBuffer to JSON conversion helpers using RapidJSON Writer
     void flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const common::Message& msg);

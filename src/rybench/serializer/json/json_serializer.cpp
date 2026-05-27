@@ -19,12 +19,13 @@ std::string JsonSerializer::name() const {
     return "json";
 }
 
-std::vector<uint8_t> JsonSerializer::serialize(const common::Message& msg) {
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+std::span<const uint8_t> JsonSerializer::serialize(const common::Message& msg) {
+    rapidjson::StringBuffer strbuf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
     flatbufferToJson(writer, msg);
-    const char* str = buffer.GetString();
-    return std::vector<uint8_t>(str, str + buffer.GetSize());
+    const auto* str = reinterpret_cast<const uint8_t*>(strbuf.GetString());
+    buffer_.assign(str, str + strbuf.GetSize());
+    return buffer_;
 }
 
 void JsonSerializer::flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const common::Message& msg) {

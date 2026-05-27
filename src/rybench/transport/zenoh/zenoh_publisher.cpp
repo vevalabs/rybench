@@ -20,27 +20,24 @@ ZenohPublisher::~ZenohPublisher() {
     shutdown();
 }
 
-void ZenohPublisher::init(const common::Config& config) {
-    // Read config from [zenoh] section
+std::expected<void, std::string> ZenohPublisher::init(const common::Config& config) {
     keyExpr_ = config.get("zenoh", "key_expr", "Benchmark/Default/Data");
     maxPayloadSize_ = static_cast<size_t>(config.getInt("zenoh", "max_payload_size", 4096));
     rateHz_ = config.getInt("zenoh", "rate_hz", 10);
 
     try {
-        // Open Zenoh session with default config
         ::zenoh::Config zconfig = ::zenoh::Config::create_default();
         auto session = ::zenoh::Session::open(std::move(zconfig));
-
-        // Create publisher
         auto publisher = session.declare_publisher(::zenoh::KeyExpr(keyExpr_));
 
         impl_ = std::make_unique<Impl>(std::move(session), std::move(publisher));
         initialized_ = true;
 
         std::cout << "[Zenoh] Publisher initialized: " << keyExpr_
-                  << " (max payload: " << maxPayloadSize_ << " bytes)" << std::endl;
+                  << " (max payload: " << maxPayloadSize_ << " bytes)\n";
+        return {};
     } catch (const std::exception& e) {
-        std::cerr << "[Zenoh] Failed to initialize: " << e.what() << std::endl;
+        return std::unexpected(std::string("[Zenoh] Failed to initialize: ") + e.what());
     }
 }
 

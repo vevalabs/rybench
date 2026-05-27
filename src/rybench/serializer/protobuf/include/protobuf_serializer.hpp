@@ -19,7 +19,7 @@ class ProtobufSerializer : public Serializer {
 public:
     explicit ProtobufSerializer(const std::string& bfbsPath);
 
-    std::vector<uint8_t> serialize(const common::Message& msg) override;
+    std::span<const uint8_t> serialize(const common::Message& msg) override;
     std::string name() const override;
 
 private:
@@ -27,6 +27,7 @@ private:
     google::protobuf::DescriptorPool pool_;
     google::protobuf::DynamicMessageFactory factory_;
     const google::protobuf::Descriptor* rootDescriptor_ = nullptr;
+    std::vector<uint8_t> buffer_;
 
     // Build Protobuf descriptor from FlatBuffers schema
     void buildDescriptorFromBfbs(const reflection::Schema* fbSchema);

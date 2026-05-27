@@ -2,11 +2,13 @@
 
 #include <rybench/serializer/serializer.hpp>
 #include <rybench/common/config.hpp>
+#include <expected>
+#include <string>
 
 namespace rybench {
 namespace serializer {
 
-SerializerPtr createSerializer(const common::Config& config);
+std::expected<SerializerPtr, std::string> createSerializer(const common::Config& config);
 
 } // namespace serializer
 } // namespace rybench
