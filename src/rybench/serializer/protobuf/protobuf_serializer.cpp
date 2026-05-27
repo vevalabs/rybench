@@ -3,8 +3,7 @@
 #include <cctype>
 #include <iostream>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 ProtobufSerializer::ProtobufSerializer(const std::string& bfbsPath)
     : factory_(&pool_) {
@@ -201,12 +200,12 @@ google::protobuf::FieldDescriptorProto::Label ProtobufSerializer::getProtoLabel(
     return google::protobuf::FieldDescriptorProto::LABEL_OPTIONAL;
 }
 
-std::vector<uint8_t> ProtobufSerializer::serialize(const common::Message& msg) {
+std::span<const uint8_t> ProtobufSerializer::serialize(const core::Message& msg) {
     if (msg.empty()) {
-        return {};
+        buffer_.clear();
+        return buffer_;
     }
 
-    // Get FlatBuffers schema
     const reflection::Schema* fbSchema = msg.schema();
     if (!fbSchema) {
         fbSchema = fbsSchema_.reflectionSchema();
@@ -214,28 +213,22 @@ std::vector<uint8_t> ProtobufSerializer::serialize(const common::Message& msg) {
     if (!fbSchema || !fbSchema->root_table()) {
         throw std::runtime_error("No FlatBuffers schema available for conversion");
     }
-
     if (!rootDescriptor_) {
         throw std::runtime_error("No Protobuf descriptor available");
     }
 
-    // Create dynamic Protobuf message
     std::unique_ptr<google::protobuf::Message> protoMsg(
         factory_.GetPrototype(rootDescriptor_)->New());
 
-    // Get FlatBuffer root table
     auto* fbTable = flatbuffers::GetAnyRoot(msg.data());
-
-    // Populate Protobuf from FlatBuffer
     populateFromFlatBuffer(protoMsg.get(), fbTable, fbSchema->root_table());
 
-    // Serialize Protobuf
-    const size_t n = static_cast<size_t>(protoMsg->ByteSizeLong());
-    std::vector<uint8_t> out(n);
-    if (!protoMsg->SerializeToArray(out.data(), static_cast<int>(n))) {
-        return {};
+    const std::size_t n = static_cast<std::size_t>(protoMsg->ByteSizeLong());
+    buffer_.resize(n);
+    if (!protoMsg->SerializeToArray(buffer_.data(), static_cast<int>(n))) {
+        buffer_.clear();
     }
-    return out;
+    return buffer_;
 }
 
 void ProtobufSerializer::populateFromFlatBuffer(google::protobuf::Message* protoMsg,
@@ -403,5 +396,4 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
     }
 }
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

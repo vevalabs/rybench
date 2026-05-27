@@ -1,16 +1,14 @@
 #include "flatbuffers_serializer.hpp"
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 std::string FlatbuffersSerializer::name() const {
     return "flatbuffers";
 }
 
-std::vector<uint8_t> FlatbuffersSerializer::serialize(const common::Message& msg) {
-    // Already in FlatBuffers format, return as-is
-    return msg.buffer();
+std::span<const uint8_t> FlatbuffersSerializer::serialize(const core::Message& msg) {
+    buffer_ = msg.buffer();
+    return buffer_;
 }
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

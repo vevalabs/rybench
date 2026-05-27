@@ -2,8 +2,7 @@
 #include <flatbuffers/flatbuffers.h>
 #include <iostream>
 
-namespace rybench {
-namespace serializer {
+namespace rybench::serializer {
 
 JsonSerializer::JsonSerializer(const std::string& bfbsPath) {
     if (!bfbsPath.empty()) {
@@ -19,15 +18,16 @@ std::string JsonSerializer::name() const {
     return "json";
 }
 
-std::vector<uint8_t> JsonSerializer::serialize(const common::Message& msg) {
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+std::span<const uint8_t> JsonSerializer::serialize(const core::Message& msg) {
+    rapidjson::StringBuffer strbuf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
     flatbufferToJson(writer, msg);
-    const char* str = buffer.GetString();
-    return std::vector<uint8_t>(str, str + buffer.GetSize());
+    const auto* str = reinterpret_cast<const uint8_t*>(strbuf.GetString());
+    buffer_.assign(str, str + strbuf.GetSize());
+    return buffer_;
 }
 
-void JsonSerializer::flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const common::Message& msg) {
+void JsonSerializer::flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const core::Message& msg) {
     if (msg.empty()) {
         writer.StartObject();
         writer.EndObject();
@@ -185,5 +185,4 @@ void JsonSerializer::valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& wri
     }
 }
 
-} // namespace serializer
-} // namespace rybench
+} // namespace rybench::serializer

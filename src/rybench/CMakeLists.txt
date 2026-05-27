@@ -39,10 +39,10 @@ endforeach()
 
 # librybench - core library (no transport dependencies)
 add_library(rybench STATIC
-    # Common
-    common/config.cpp
-    common/message.cpp
-    common/flatbuffers_schema.cpp
+    # Core
+    core/config.cpp
+    core/message.cpp
+    core/flatbuffers_schema.cpp
     # Generator
     generator/fixed/fixed_generator.cpp
     generator/schema_guided/schema_guided_generator.cpp
@@ -54,27 +54,18 @@ add_library(rybench STATIC
     serializer/protobuf/protobuf_serializer.cpp
     serializer/flatbuffers/flatbuffers_serializer.cpp
     serializer/serializer_factory.cpp
+    # Transport engine (transport-agnostic publish/consume loop)
+    core/engine.cpp
     # Generated sources
     ${FBS_HDRS}
     ${FBS_BFBS_FILES}
 )
 
-target_include_directories(rybench PUBLIC
-    # Common
-    ${CMAKE_CURRENT_SOURCE_DIR}/common/include
-    # Generator
-    ${CMAKE_CURRENT_SOURCE_DIR}/generator/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/generator/fixed/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/generator/schema_guided/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/generator/property_guided/include
-    # Serializer
-    ${CMAKE_CURRENT_SOURCE_DIR}/serializer/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/serializer/json/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/serializer/protobuf/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/serializer/flatbuffers/include
-    # Generated headers
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${Protobuf_INCLUDE_DIRS}
+target_include_directories(rybench
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${Protobuf_INCLUDE_DIRS}
 )
 
 target_link_libraries(rybench PUBLIC

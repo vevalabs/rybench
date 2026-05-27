@@ -1,24 +1,23 @@
-#include "include/reflection_builder.hpp"
+#include <rybench/generator/reflection_builder.hpp>
 #include <chrono>
 #include <algorithm>
 #include <cstring>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
-ReflectionBuilder::ReflectionBuilder(const common::FlatBuffersSchema& schema)
+ReflectionBuilder::ReflectionBuilder(const core::FlatBuffersSchema& schema)
     : schema_(schema) {}
 
-common::Message ReflectionBuilder::build(std::mt19937_64& rng) {
+core::Message ReflectionBuilder::build(std::mt19937_64& rng) {
     if (!schema_.isLoaded()) {
-        return common::Message();
+        return core::Message();
     }
 
     flatbuffers::FlatBufferBuilder builder(1024);
 
     auto* rootTable = schema_.rootTable();
     if (!rootTable) {
-        return common::Message();
+        return core::Message();
     }
 
     auto rootOffset = buildTable(builder, rootTable, schema_.fields(), rng, "");
@@ -29,7 +28,7 @@ common::Message ReflectionBuilder::build(std::mt19937_64& rng) {
     auto size = builder.GetSize();
 
     std::vector<uint8_t> buffer(buf, buf + size);
-    return common::Message(std::move(buffer), schema_.reflectionSchema());
+    return core::Message(std::move(buffer), schema_.reflectionSchema());
 }
 
 void ReflectionBuilder::setIntGenerator(const std::string& fieldPath, ScalarGenerator gen) {
@@ -73,7 +72,7 @@ void ReflectionBuilder::setFixedValue(const std::string& fieldPath, const std::s
 flatbuffers::Offset<void> ReflectionBuilder::buildTable(
     flatbuffers::FlatBufferBuilder& builder,
     const reflection::Object* table,
-    const std::vector<common::FbsSchemaField>& fields,
+    const std::vector<core::FbsSchemaField>& fields,
     std::mt19937_64& rng,
     const std::string& path) {
 
@@ -252,7 +251,7 @@ flatbuffers::Offset<void> ReflectionBuilder::buildTable(
 
 flatbuffers::Offset<flatbuffers::String> ReflectionBuilder::buildString(
     flatbuffers::FlatBufferBuilder& builder,
-    const common::FbsFieldConstraints& constraints,
+    const core::FbsFieldConstraints& constraints,
     std::mt19937_64& rng,
     const std::string& path) {
 
@@ -263,7 +262,7 @@ flatbuffers::Offset<flatbuffers::String> ReflectionBuilder::buildString(
 flatbuffers::Offset<void> ReflectionBuilder::buildVector(
     flatbuffers::FlatBufferBuilder& builder,
     const reflection::Field* field,
-    const common::FbsSchemaField& schemaField,
+    const core::FbsSchemaField& schemaField,
     std::mt19937_64& rng,
     const std::string& path) {
 
@@ -286,7 +285,7 @@ flatbuffers::Offset<void> ReflectionBuilder::buildVector(
                 for (size_t i = 0; i < count; ++i) {
                     std::string elemPath = path + "[" + std::to_string(i) + "]";
                     auto& elementFields = schemaField.children.empty() ?
-                        std::vector<common::FbsSchemaField>() : schemaField.children[0].children;
+                        std::vector<core::FbsSchemaField>() : schemaField.children[0].children;
                     auto offset = buildTable(builder, elementObj, elementFields, rng, elemPath);
                     tableOffsets.push_back(flatbuffers::Offset<flatbuffers::Table>(offset.o));
                 }
@@ -296,7 +295,7 @@ flatbuffers::Offset<void> ReflectionBuilder::buildVector(
     } else if (elementType == reflection::BaseType::String) {
         // Vector of strings
         std::vector<flatbuffers::Offset<flatbuffers::String>> strOffsets;
-        common::FbsFieldConstraints elemConstraints;
+        core::FbsFieldConstraints elemConstraints;
         if (!schemaField.children.empty()) {
             elemConstraints = schemaField.children[0].constraints;
         }
@@ -307,7 +306,7 @@ flatbuffers::Offset<void> ReflectionBuilder::buildVector(
         return builder.CreateVector(strOffsets).Union();
     } else {
         // Vector of scalars
-        common::FbsFieldConstraints elemConstraints;
+        core::FbsFieldConstraints elemConstraints;
         if (!schemaField.children.empty()) {
             elemConstraints = schemaField.children[0].constraints;
         }
@@ -377,7 +376,7 @@ flatbuffers::Offset<void> ReflectionBuilder::buildVector(
 flatbuffers::Offset<void> ReflectionBuilder::buildStruct(
     flatbuffers::FlatBufferBuilder& builder,
     const reflection::Object* structDef,
-    const std::vector<common::FbsSchemaField>& fields,
+    const std::vector<core::FbsSchemaField>& fields,
     std::mt19937_64& rng,
     const std::string& path) {
 
@@ -395,7 +394,7 @@ flatbuffers::Offset<void> ReflectionBuilder::buildStruct(
 }
 
 int64_t ReflectionBuilder::generateInt(
-    const common::FbsFieldConstraints& c,
+    const core::FbsFieldConstraints& c,
     std::mt19937_64& rng,
     const std::string& path,
     bool isUnsigned) {
@@ -416,7 +415,7 @@ int64_t ReflectionBuilder::generateInt(
 }
 
 double ReflectionBuilder::generateDouble(
-    const common::FbsFieldConstraints& c,
+    const core::FbsFieldConstraints& c,
     std::mt19937_64& rng,
     const std::string& path) {
 
@@ -439,7 +438,7 @@ bool ReflectionBuilder::generateBool(std::mt19937_64& rng) {
 }
 
 std::string ReflectionBuilder::generateString(
-    const common::FbsFieldConstraints& c,
+    const core::FbsFieldConstraints& c,
     std::mt19937_64& rng,
     const std::string& path) {
 
@@ -512,5 +511,4 @@ std::string ReflectionBuilder::fieldPath(const std::string& basePath, const std:
     return basePath + "." + fieldName;
 }
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

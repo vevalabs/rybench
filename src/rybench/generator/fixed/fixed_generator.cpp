@@ -1,8 +1,7 @@
-#include "include/fixed_generator.hpp"
+#include "fixed_generator.hpp"
 #include <stdexcept>
 
-namespace rybench {
-namespace generator {
+namespace rybench::generator {
 
 FixedGenerator::~FixedGenerator() {
     if (file_.is_open()) {
@@ -10,7 +9,7 @@ FixedGenerator::~FixedGenerator() {
     }
 }
 
-void FixedGenerator::loadSchema(const common::FlatBuffersSchema& schema) {
+void FixedGenerator::loadSchema(const core::FlatBuffersSchema& schema) {
     schema_ = &schema;
 
     if (!file_.is_open()) {
@@ -26,7 +25,7 @@ void FixedGenerator::loadDump(const std::string& filepath) {
     finished_ = false;
 }
 
-common::Message FixedGenerator::generate() {
+core::Message FixedGenerator::generate() {
     // If we've reached EOF, repeat the last message indefinitely
     if (finished_) {
         return lastMessage_;
@@ -48,17 +47,12 @@ common::Message FixedGenerator::generate() {
         return lastMessage_;
     }
 
-    lastMessage_ = common::Message(std::move(buffer), schema_ ? schema_->reflectionSchema() : nullptr);
+    lastMessage_ = core::Message(std::move(buffer), schema_ ? schema_->reflectionSchema() : nullptr);
     return lastMessage_;
-}
-
-Algorithm FixedGenerator::algorithm() const {
-    return Algorithm::Fixed;
 }
 
 std::string FixedGenerator::name() const {
     return "fixed";
 }
 
-} // namespace generator
-} // namespace rybench
+} // namespace rybench::generator

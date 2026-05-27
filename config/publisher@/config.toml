@@ -15,4 +15,4 @@ replay = "dump/benchmark-flatbuffers.out"
 
 [serializer]
 # type: json, protobuf, flatbuffers
-type = "protobuf"
+type = "json"
