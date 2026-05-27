@@ -1,10 +1,10 @@
 #pragma once
 
-#include <rybench/common/flatbuffers_schema.hpp>
+#include <rybench/core/flatbuffers_schema.hpp>
 #include <string>
 #include <memory>
 
-namespace rybench::common {
+namespace rybench::core {
 
 class Config {
 public:
@@ -45,4 +45,4 @@ private:
     std::string instanceName_;
 };
 
-} // namespace rybench::common
+} // namespace rybench::core

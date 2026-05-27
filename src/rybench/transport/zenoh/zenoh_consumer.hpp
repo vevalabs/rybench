@@ -16,7 +16,7 @@ public:
     ZenohConsumer();
     ~ZenohConsumer();
 
-    std::expected<void, std::string> init(const common::Config& config) override;
+    std::expected<void, std::string> init(const core::Config& config) override;
     void run(std::atomic<bool>& running) override;
     void shutdown() override;
     uint64_t messageCount() const override { return messageCount_; }

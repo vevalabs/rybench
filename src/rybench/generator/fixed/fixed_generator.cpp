@@ -9,7 +9,7 @@ FixedGenerator::~FixedGenerator() {
     }
 }
 
-void FixedGenerator::loadSchema(const common::FlatBuffersSchema& schema) {
+void FixedGenerator::loadSchema(const core::FlatBuffersSchema& schema) {
     schema_ = &schema;
 
     if (!file_.is_open()) {
@@ -25,7 +25,7 @@ void FixedGenerator::loadDump(const std::string& filepath) {
     finished_ = false;
 }
 
-common::Message FixedGenerator::generate() {
+core::Message FixedGenerator::generate() {
     // If we've reached EOF, repeat the last message indefinitely
     if (finished_) {
         return lastMessage_;
@@ -47,7 +47,7 @@ common::Message FixedGenerator::generate() {
         return lastMessage_;
     }
 
-    lastMessage_ = common::Message(std::move(buffer), schema_ ? schema_->reflectionSchema() : nullptr);
+    lastMessage_ = core::Message(std::move(buffer), schema_ ? schema_->reflectionSchema() : nullptr);
     return lastMessage_;
 }
 

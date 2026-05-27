@@ -1,6 +1,10 @@
 add_executable(rybench-filewriter
     main.cpp
-    ${CMAKE_SOURCE_DIR}/src/rybench/transport/filewriter/filewriter_runner.cpp
+    ${CMAKE_SOURCE_DIR}/src/rybench/transport/filewriter/filewriter_publisher.cpp
+)
+
+target_include_directories(rybench-filewriter PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/rybench/transport/filewriter
 )
 
 target_link_libraries(rybench-filewriter PRIVATE rybench)

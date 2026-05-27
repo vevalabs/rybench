@@ -1,11 +1,11 @@
-#include <rybench/common/config.hpp>
-#include <rybench/common/node_config_path.hpp>
+#include <rybench/core/config.hpp>
+#include <rybench/core/node_config_path.hpp>
 #include <toml++/toml.hpp>
 #include <stdexcept>
 #include <iostream>
 #include <filesystem>
 
-namespace rybench::common {
+namespace rybench::core {
 
 struct Config::Impl {
     toml::table table;
@@ -48,7 +48,7 @@ void Config::validate() {
 void Config::loadNode(const std::string& configRoot, const std::string& nodeName) {
     namespace fs = std::filesystem;
 
-    std::string resolvedPath = common::resolveNodeConfigPath(configRoot, nodeName, instanceName_);
+    std::string resolvedPath = resolveNodeConfigPath(configRoot, nodeName, instanceName_);
 
     // If the node name has the form "transport:role@instance", look for a base config at
     // configRoot/role@/config.toml and merge it under the transport-specific overlay.
@@ -156,4 +156,4 @@ bool Config::hasKey(const std::string& section, const std::string& key) const {
     return false;
 }
 
-} // namespace rybench::common
+} // namespace rybench::core

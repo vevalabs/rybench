@@ -20,7 +20,7 @@ ZenohPublisher::~ZenohPublisher() {
     shutdown();
 }
 
-std::expected<void, std::string> ZenohPublisher::init(const common::Config& config) {
+std::expected<void, std::string> ZenohPublisher::init(const core::Config& config) {
     keyExpr_ = config.get("zenoh", "key_expr", "Benchmark/Default/Data");
     maxPayloadSize_ = static_cast<size_t>(config.getInt("zenoh", "max_payload_size", 4096));
     rateHz_ = config.getInt("zenoh", "rate_hz", 10);

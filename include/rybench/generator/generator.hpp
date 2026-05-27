@@ -1,7 +1,7 @@
 #pragma once
 
-#include <rybench/common/flatbuffers_schema.hpp>
-#include <rybench/common/message.hpp>
+#include <rybench/core/flatbuffers_schema.hpp>
+#include <rybench/core/message.hpp>
 #include <memory>
 #include <string>
 
@@ -11,8 +11,8 @@ class Generator {
 public:
     virtual ~Generator() = default;
 
-    virtual void loadSchema(const common::FlatBuffersSchema& schema) = 0;
-    virtual common::Message generate() = 0;
+    virtual void loadSchema(const core::FlatBuffersSchema& schema) = 0;
+    virtual core::Message generate() = 0;
     virtual std::string name() const = 0;
 };
 

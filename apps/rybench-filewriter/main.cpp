@@ -1,20 +1,18 @@
-#include <rybench/transport/filewriter/filewriter_runner.hpp>
-#include <rybench/common/config.hpp>
-#include <rybench/common/signal_handler.hpp>
+#include "filewriter_publisher.hpp"
+#include <rybench/core/engine.hpp>
+#include <rybench/core/config.hpp>
+#include <rybench/core/signal_handler.hpp>
 
-#include <atomic>
 #include <iostream>
-
-std::atomic<bool> running{true};
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: rybench-filewriter <node-name>  (e.g. publisher@pub1)\n"
+        std::cerr << "Usage: rybench-filewriter <node-name>  (e.g. filewriter:publisher@)\n"
                   << "  $RYBENCH_CONFIG must point to the config root directory.\n";
         return 1;
     }
 
-    rybench::common::SignalHandler::setup(running);
+    rybench::core::SignalHandler signals;
 
     const char* configRoot = std::getenv("RYBENCH_CONFIG");
     if (!configRoot) {
@@ -22,7 +20,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    rybench::common::Config config;
+    rybench::core::Config config;
     try {
         config.loadNode(configRoot, argv[1]);
     } catch (const std::exception& e) {
@@ -30,5 +28,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    return rybench::transport::filewriter::run(config, running);
+    rybench::core::Engine engine(config, signals.running());
+    rybench::transport::filewriter::FilewriterPublisher publisher;
+    return engine.run(publisher);
 }

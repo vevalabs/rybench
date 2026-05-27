@@ -2,7 +2,6 @@ add_executable(rybench-iceoryx2
     main.cpp
     ${CMAKE_SOURCE_DIR}/src/rybench/transport/iceoryx2/iceoryx2_publisher.cpp
     ${CMAKE_SOURCE_DIR}/src/rybench/transport/iceoryx2/iceoryx2_consumer.cpp
-    ${CMAKE_SOURCE_DIR}/src/rybench/transport/iceoryx2/iceoryx2_runner.cpp
 )
 
 target_include_directories(rybench-iceoryx2 PRIVATE

@@ -11,7 +11,7 @@ class FlatbuffersSerializer : public Serializer {
 public:
     FlatbuffersSerializer() = default;
 
-    std::span<const uint8_t> serialize(const common::Message& msg) override;
+    std::span<const uint8_t> serialize(const core::Message& msg) override;
     std::string name() const override;
 
 private:

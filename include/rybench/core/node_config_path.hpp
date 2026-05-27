@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace rybench::common {
+namespace rybench::core {
 
 // Resolve the config file path for a node, following the systemd template convention:
 //
@@ -35,4 +35,4 @@ inline std::string resolveNodeConfigPath(const std::string& configRoot,
         concrete.string() + " and " + tmpl.string());
 }
 
-} // namespace rybench::common
+} // namespace rybench::core

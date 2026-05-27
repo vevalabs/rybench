@@ -14,7 +14,7 @@ class PropertyGuidedGenerator : public Generator {
 public:
     PropertyGuidedGenerator();
 
-    void loadSchema(const common::FlatBuffersSchema& schema) override;
+    void loadSchema(const core::FlatBuffersSchema& schema) override;
 
     // Set custom generators for specific field paths
     void setIntProperty(const std::string& fieldPath, std::function<int64_t(std::mt19937_64&)> gen);
@@ -56,11 +56,11 @@ public:
         });
     }
 
-    common::Message generate() override;
+    core::Message generate() override;
     std::string name() const override;
 
 private:
-    const common::FlatBuffersSchema* schema_ = nullptr;
+    const core::FlatBuffersSchema* schema_ = nullptr;
     std::mt19937_64 rng_;
     std::unique_ptr<ReflectionBuilder> builder_;
 };

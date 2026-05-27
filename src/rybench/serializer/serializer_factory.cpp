@@ -7,7 +7,7 @@
 
 namespace rybench::serializer {
 
-std::expected<SerializerPtr, std::string> createSerializer(const common::Config& config) {
+std::expected<SerializerPtr, std::string> createSerializer(const core::Config& config) {
     try {
         std::string type = config.get("serializer", "type", "json");
         std::string bfbsPath = config.get("schema", "bfbs", "");

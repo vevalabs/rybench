@@ -200,7 +200,7 @@ google::protobuf::FieldDescriptorProto::Label ProtobufSerializer::getProtoLabel(
     return google::protobuf::FieldDescriptorProto::LABEL_OPTIONAL;
 }
 
-std::span<const uint8_t> ProtobufSerializer::serialize(const common::Message& msg) {
+std::span<const uint8_t> ProtobufSerializer::serialize(const core::Message& msg) {
     if (msg.empty()) {
         buffer_.clear();
         return buffer_;

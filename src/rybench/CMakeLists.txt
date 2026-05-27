@@ -39,10 +39,10 @@ endforeach()
 
 # librybench - core library (no transport dependencies)
 add_library(rybench STATIC
-    # Common
-    common/config.cpp
-    common/message.cpp
-    common/flatbuffers_schema.cpp
+    # Core
+    core/config.cpp
+    core/message.cpp
+    core/flatbuffers_schema.cpp
     # Generator
     generator/fixed/fixed_generator.cpp
     generator/schema_guided/schema_guided_generator.cpp
@@ -54,6 +54,8 @@ add_library(rybench STATIC
     serializer/protobuf/protobuf_serializer.cpp
     serializer/flatbuffers/flatbuffers_serializer.cpp
     serializer/serializer_factory.cpp
+    # Transport engine (transport-agnostic publish/consume loop)
+    core/engine.cpp
     # Generated sources
     ${FBS_HDRS}
     ${FBS_BFBS_FILES}

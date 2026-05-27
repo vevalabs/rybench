@@ -5,7 +5,7 @@
 #include <string>
 #include <flatbuffers/reflection.h>
 
-namespace rybench::common {
+namespace rybench::core {
 
 class Message {
 public:
@@ -45,4 +45,4 @@ private:
     const reflection::Schema* schema_ = nullptr;
 };
 
-} // namespace rybench::common
+} // namespace rybench::core

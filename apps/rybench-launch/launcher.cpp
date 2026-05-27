@@ -1,5 +1,5 @@
 #include "launcher.hpp"
-#include <rybench/common/node_config_path.hpp>
+#include <rybench/core/node_config_path.hpp>
 #include <toml++/toml.hpp>
 
 #include <csignal>
@@ -39,7 +39,7 @@ int launch(const std::string& configRoot,
 
     for (const auto& nodeName : nodeNames) {
         std::string instanceName;
-        std::string configPath = rybench::common::resolveNodeConfigPath(configRoot, nodeName, instanceName);
+        std::string configPath = rybench::core::resolveNodeConfigPath(configRoot, nodeName, instanceName);
         std::string transport  = readTransport(configPath);
         std::string binaryName = "rybench-" + transport;
         fs::path candidate = fs::path(binDir) / binaryName;

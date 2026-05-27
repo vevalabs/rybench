@@ -1,7 +1,7 @@
 #pragma once
 
 #include <rybench/serializer/serializer.hpp>
-#include <rybench/common/flatbuffers_schema.hpp>
+#include <rybench/core/flatbuffers_schema.hpp>
 #include <google/protobuf/message.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
@@ -18,11 +18,11 @@ class ProtobufSerializer : public Serializer {
 public:
     explicit ProtobufSerializer(const std::string& bfbsPath);
 
-    std::span<const uint8_t> serialize(const common::Message& msg) override;
+    std::span<const uint8_t> serialize(const core::Message& msg) override;
     std::string name() const override;
 
 private:
-    common::FlatBuffersSchema fbsSchema_;
+    core::FlatBuffersSchema fbsSchema_;
     google::protobuf::DescriptorPool pool_;
     google::protobuf::DynamicMessageFactory factory_;
     const google::protobuf::Descriptor* rootDescriptor_ = nullptr;

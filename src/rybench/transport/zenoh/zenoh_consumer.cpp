@@ -23,7 +23,7 @@ ZenohConsumer::~ZenohConsumer() {
     shutdown();
 }
 
-std::expected<void, std::string> ZenohConsumer::init(const common::Config& config) {
+std::expected<void, std::string> ZenohConsumer::init(const core::Config& config) {
     keyExpr_ = config.get("zenoh", "key_expr", "Benchmark/Default/Data");
     outputPath_ = config.get("zenoh", "output", "dump/zenoh-received.bin");
 

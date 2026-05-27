@@ -7,7 +7,7 @@
 
 namespace rybench::generator {
 
-std::expected<GeneratorPtr, std::string> createGenerator(const common::Config& config) {
+std::expected<GeneratorPtr, std::string> createGenerator(const core::Config& config) {
     try {
         const auto& schema = config.schema();
         std::string algorithm = config.get("generator", "algorithm", "schema_guided");

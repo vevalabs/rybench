@@ -2,7 +2,6 @@ add_executable(rybench-zenoh
     main.cpp
     ${CMAKE_SOURCE_DIR}/src/rybench/transport/zenoh/zenoh_publisher.cpp
     ${CMAKE_SOURCE_DIR}/src/rybench/transport/zenoh/zenoh_consumer.cpp
-    ${CMAKE_SOURCE_DIR}/src/rybench/transport/zenoh/zenoh_runner.cpp
 )
 
 target_include_directories(rybench-zenoh PRIVATE

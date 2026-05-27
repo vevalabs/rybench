@@ -22,7 +22,7 @@ Iceoryx2Consumer::~Iceoryx2Consumer() {
     shutdown();
 }
 
-std::expected<void, std::string> Iceoryx2Consumer::init(const common::Config& config) {
+std::expected<void, std::string> Iceoryx2Consumer::init(const core::Config& config) {
     service_ = config.get("iceoryx2", "service", "Benchmark");
     instance_ = config.get("iceoryx2", "instance", "Default");
     event_ = config.get("iceoryx2", "event", "Data");

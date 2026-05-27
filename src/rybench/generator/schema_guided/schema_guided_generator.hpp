@@ -12,12 +12,12 @@ class SchemaGuidedGenerator : public Generator {
 public:
     explicit SchemaGuidedGenerator(uint64_t seed = 0);
 
-    void loadSchema(const common::FlatBuffersSchema& schema) override;
-    common::Message generate() override;
+    void loadSchema(const core::FlatBuffersSchema& schema) override;
+    core::Message generate() override;
     std::string name() const override;
 
 private:
-    const common::FlatBuffersSchema* schema_ = nullptr;
+    const core::FlatBuffersSchema* schema_ = nullptr;
     std::mt19937_64 rng_;
     std::unique_ptr<ReflectionBuilder> builder_;
 };

@@ -1,11 +1,11 @@
-#include <rybench/transport/iceoryx2/iceoryx2_runner.hpp>
-#include <rybench/common/config.hpp>
-#include <rybench/common/signal_handler.hpp>
+#include "iceoryx2_publisher.hpp"
+#include "iceoryx2_consumer.hpp"
+#include <rybench/core/engine.hpp>
+#include <rybench/core/config.hpp>
+#include <rybench/core/signal_handler.hpp>
 
 #include <atomic>
 #include <iostream>
-
-std::atomic<bool> running{true};
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    rybench::common::SignalHandler::setup(running);
+    rybench::core::SignalHandler signals;
 
     const char* configRoot = std::getenv("RYBENCH_CONFIG");
     if (!configRoot) {
@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    rybench::common::Config config;
+    rybench::core::Config config;
     try {
         config.loadNode(configRoot, argv[1]);
     } catch (const std::exception& e) {
@@ -30,5 +30,18 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    return rybench::transport::iceoryx2::run(config, running);
+    rybench::core::Engine engine(config, signals.running());
+
+    std::string mode = config.get("iceoryx2", "mode", "publish");
+    if (mode == "consume") {
+        rybench::transport::iceoryx2::Iceoryx2Consumer consumer;
+        return engine.run(consumer);
+    } else if (mode == "publish") {
+        rybench::transport::iceoryx2::Iceoryx2Publisher publisher;
+        return engine.run(publisher);
+    } else {
+        std::cerr << "Choose publisher/consumer Unsupported mode:" << mode;
+        return 1;
+    }
 }
+    

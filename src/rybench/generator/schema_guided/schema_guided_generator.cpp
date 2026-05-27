@@ -11,14 +11,14 @@ SchemaGuidedGenerator::SchemaGuidedGenerator(uint64_t seed) {
     }
 }
 
-void SchemaGuidedGenerator::loadSchema(const common::FlatBuffersSchema& schema) {
+void SchemaGuidedGenerator::loadSchema(const core::FlatBuffersSchema& schema) {
     schema_ = &schema;
     builder_ = std::make_unique<ReflectionBuilder>(schema);
 }
 
-common::Message SchemaGuidedGenerator::generate() {
+core::Message SchemaGuidedGenerator::generate() {
     if (!builder_) {
-        return common::Message();
+        return core::Message();
     }
     return builder_->build(rng_);
 }

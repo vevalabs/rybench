@@ -18,7 +18,7 @@ std::string JsonSerializer::name() const {
     return "json";
 }
 
-std::span<const uint8_t> JsonSerializer::serialize(const common::Message& msg) {
+std::span<const uint8_t> JsonSerializer::serialize(const core::Message& msg) {
     rapidjson::StringBuffer strbuf;
     rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
     flatbufferToJson(writer, msg);
@@ -27,7 +27,7 @@ std::span<const uint8_t> JsonSerializer::serialize(const common::Message& msg) {
     return buffer_;
 }
 
-void JsonSerializer::flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const common::Message& msg) {
+void JsonSerializer::flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const core::Message& msg) {
     if (msg.empty()) {
         writer.StartObject();
         writer.EndObject();

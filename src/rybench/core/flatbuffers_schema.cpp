@@ -1,9 +1,9 @@
-#include <rybench/common/flatbuffers_schema.hpp>
+#include <rybench/core/flatbuffers_schema.hpp>
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>
 
-namespace rybench::common {
+namespace rybench::core {
 
 void FlatBuffersSchema::loadFromBfbs(const std::string& filepath) {
     std::ifstream file(filepath, std::ios::binary | std::ios::ate);
@@ -193,4 +193,4 @@ FbsFieldType FlatBuffersSchema::baseTypeToFieldType(reflection::BaseType baseTyp
     }
 }
 
-} // namespace rybench::common
+} // namespace rybench::core

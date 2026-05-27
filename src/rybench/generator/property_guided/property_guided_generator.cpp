@@ -6,7 +6,7 @@ namespace rybench::generator {
 PropertyGuidedGenerator::PropertyGuidedGenerator()
     : rng_(std::chrono::steady_clock::now().time_since_epoch().count()) {}
 
-void PropertyGuidedGenerator::loadSchema(const common::FlatBuffersSchema& schema) {
+void PropertyGuidedGenerator::loadSchema(const core::FlatBuffersSchema& schema) {
     schema_ = &schema;
     builder_ = std::make_unique<ReflectionBuilder>(schema);
 }
@@ -65,9 +65,9 @@ void PropertyGuidedGenerator::setFixedValue(const std::string& fieldPath, const 
     }
 }
 
-common::Message PropertyGuidedGenerator::generate() {
+core::Message PropertyGuidedGenerator::generate() {
     if (!builder_) {
-        return common::Message();
+        return core::Message();
     }
     return builder_->build(rng_);
 }
