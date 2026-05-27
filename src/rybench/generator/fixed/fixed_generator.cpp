@@ -52,10 +52,6 @@ common::Message FixedGenerator::generate() {
     return lastMessage_;
 }
 
-Algorithm FixedGenerator::algorithm() const {
-    return Algorithm::Fixed;
-}
-
 std::string FixedGenerator::name() const {
     return "fixed";
 }

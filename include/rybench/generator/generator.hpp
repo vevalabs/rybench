@@ -8,22 +8,12 @@
 namespace rybench {
 namespace generator {
 
-enum class Algorithm {
-    Fixed,
-    SemiRandom,
-    SchemaGuided,
-    PropertyGuided
-};
-
 class Generator {
 public:
     virtual ~Generator() = default;
 
-    // New FlatBuffers-based interface
     virtual void loadSchema(const common::FlatBuffersSchema& schema) = 0;
     virtual common::Message generate() = 0;
-
-    virtual Algorithm algorithm() const = 0;
     virtual std::string name() const = 0;
 };
 

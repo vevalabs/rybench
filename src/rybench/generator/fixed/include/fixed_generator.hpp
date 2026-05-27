@@ -15,7 +15,6 @@ public:
     void loadSchema(const common::FlatBuffersSchema& schema) override;
     void loadDump(const std::string& filepath);
     common::Message generate() override;
-    Algorithm algorithm() const override;
     std::string name() const override;
 
 private:

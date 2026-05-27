@@ -73,10 +73,6 @@ common::Message PropertyGuidedGenerator::generate() {
     return builder_->build(rng_);
 }
 
-Algorithm PropertyGuidedGenerator::algorithm() const {
-    return Algorithm::PropertyGuided;
-}
-
 std::string PropertyGuidedGenerator::name() const {
     return "property_guided";
 }

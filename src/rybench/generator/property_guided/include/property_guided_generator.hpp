@@ -58,7 +58,6 @@ public:
     }
 
     common::Message generate() override;
-    Algorithm algorithm() const override;
     std::string name() const override;
 
 private:

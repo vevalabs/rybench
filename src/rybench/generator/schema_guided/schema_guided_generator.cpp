@@ -24,10 +24,6 @@ common::Message SchemaGuidedGenerator::generate() {
     return builder_->build(rng_);
 }
 
-Algorithm SchemaGuidedGenerator::algorithm() const {
-    return Algorithm::SchemaGuided;
-}
-
 std::string SchemaGuidedGenerator::name() const {
     return "schema_guided";
 }
