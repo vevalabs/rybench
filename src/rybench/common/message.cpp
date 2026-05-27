@@ -1,4 +1,4 @@
-#include "include/message.hpp"
+#include <rybench/common/message.hpp>
 #include <flatbuffers/flatbuffers.h>
 
 namespace rybench {

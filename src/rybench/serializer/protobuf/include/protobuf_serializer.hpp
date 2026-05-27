@@ -1,7 +1,7 @@
 #pragma once
 
-#include "serializer.hpp"
-#include "flatbuffers_schema.hpp"
+#include <rybench/serializer/serializer.hpp>
+#include <rybench/common/flatbuffers_schema.hpp>
 #include <google/protobuf/message.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
@@ -15,7 +15,7 @@
 namespace rybench {
 namespace serializer {
 
-class ProtobufSerializer : public ISerializer {
+class ProtobufSerializer : public Serializer {
 public:
     explicit ProtobufSerializer(const std::string& bfbsPath);
 

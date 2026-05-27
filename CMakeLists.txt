@@ -39,10 +39,10 @@ FetchContent_MakeAvailable(tomlplusplus)
 add_subdirectory(src/rybench)
 
 # Filewriter app (always built - no external dependencies)
-add_subdirectory(src/rybench-filewriter)
+add_subdirectory(apps/rybench-filewriter)
 
 # Launcher (always built - no transport dependencies)
-add_subdirectory(src/rybench-launch)
+add_subdirectory(apps/rybench-launch)
 
 # Zenoh app
 if(BUILD_ZENOH_APP)
@@ -52,7 +52,7 @@ if(BUILD_ZENOH_APP)
     endif()
 
     if(zenohcxx_FOUND)
-        add_subdirectory(src/rybench-zenoh)
+        add_subdirectory(apps/rybench-zenoh)
         message(STATUS "Zenoh app: ENABLED")
     else()
         message(STATUS "Zenoh app: DISABLED (zenohcxx not found)")
@@ -78,7 +78,7 @@ if(BUILD_ICEORYX2_APP)
         add_library(Iceoryx2::cxx ALIAS static-lib-cxx)
     endif()
 
-    add_subdirectory(src/rybench-iceoryx2)
+    add_subdirectory(apps/rybench-iceoryx2)
     message(STATUS "Iceoryx2 app: ENABLED")
 endif()
 

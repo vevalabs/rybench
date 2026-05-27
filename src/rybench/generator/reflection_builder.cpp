@@ -1,4 +1,4 @@
-#include "include/reflection_builder.hpp"
+#include <rybench/generator/reflection_builder.hpp>
 #include <chrono>
 #include <algorithm>
 #include <cstring>

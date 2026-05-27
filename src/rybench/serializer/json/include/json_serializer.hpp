@@ -1,7 +1,7 @@
 #pragma once
 
-#include "serializer.hpp"
-#include "flatbuffers_schema.hpp"
+#include <rybench/serializer/serializer.hpp>
+#include <rybench/common/flatbuffers_schema.hpp>
 #include <rapidjson/writer.h>
 #include <rapidjson/stringbuffer.h>
 #include <string>
@@ -9,7 +9,7 @@
 namespace rybench {
 namespace serializer {
 
-class JsonSerializer : public ISerializer {
+class JsonSerializer : public Serializer {
 public:
     explicit JsonSerializer(const std::string& bfbsPath = "");
 

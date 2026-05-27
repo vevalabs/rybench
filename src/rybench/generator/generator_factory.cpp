@@ -1,4 +1,4 @@
-#include "include/generator_factory.hpp"
+#include <rybench/generator/generator_factory.hpp>
 #include "fixed/include/fixed_generator.hpp"
 #include "schema_guided/include/schema_guided_generator.hpp"
 #include "property_guided/include/property_guided_generator.hpp"

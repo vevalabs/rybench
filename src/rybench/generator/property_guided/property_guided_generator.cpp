@@ -1,4 +1,4 @@
-#include "include/property_guided_generator.hpp"
+#include "property_guided_generator.hpp"
 #include <chrono>
 
 namespace rybench {

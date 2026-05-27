@@ -1,5 +1,5 @@
-#include "config.hpp"
-#include "node_config_path.hpp"
+#include <rybench/common/config.hpp>
+#include <rybench/common/node_config_path.hpp>
 #include <toml++/toml.hpp>
 #include <stdexcept>
 #include <iostream>

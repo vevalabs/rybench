@@ -59,22 +59,18 @@ add_library(rybench STATIC
     ${FBS_BFBS_FILES}
 )
 
-target_include_directories(rybench PUBLIC
-    # Common
-    ${CMAKE_CURRENT_SOURCE_DIR}/common/include
-    # Generator
-    ${CMAKE_CURRENT_SOURCE_DIR}/generator/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/generator/fixed/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/generator/schema_guided/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/generator/property_guided/include
-    # Serializer
-    ${CMAKE_CURRENT_SOURCE_DIR}/serializer/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/serializer/json/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/serializer/protobuf/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/serializer/flatbuffers/include
-    # Generated headers
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${Protobuf_INCLUDE_DIRS}
+target_include_directories(rybench
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${Protobuf_INCLUDE_DIRS}
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/generator/fixed/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/generator/schema_guided/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/generator/property_guided/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/serializer/json/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/serializer/protobuf/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/serializer/flatbuffers/include
 )
 
 target_link_libraries(rybench PUBLIC

@@ -1,4 +1,4 @@
-#include "include/flatbuffers_schema.hpp"
+#include <rybench/common/flatbuffers_schema.hpp>
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>

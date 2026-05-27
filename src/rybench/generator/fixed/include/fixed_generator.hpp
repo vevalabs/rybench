@@ -1,13 +1,13 @@
 #pragma once
 
-#include "generator.hpp"
+#include <rybench/generator/generator.hpp>
 #include <fstream>
 #include <string>
 
 namespace rybench {
 namespace generator {
 
-class FixedGenerator : public IGenerator {
+class FixedGenerator : public Generator {
 public:
     FixedGenerator() = default;
     ~FixedGenerator();

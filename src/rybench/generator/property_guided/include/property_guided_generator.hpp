@@ -1,7 +1,7 @@
 #pragma once
 
-#include "generator.hpp"
-#include "reflection_builder.hpp"
+#include <rybench/generator/generator.hpp>
+#include <rybench/generator/reflection_builder.hpp>
 #include <random>
 #include <functional>
 #include <unordered_map>
@@ -11,7 +11,7 @@
 namespace rybench {
 namespace generator {
 
-class PropertyGuidedGenerator : public IGenerator {
+class PropertyGuidedGenerator : public Generator {
 public:
     PropertyGuidedGenerator();
 

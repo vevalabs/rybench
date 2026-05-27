@@ -1,4 +1,4 @@
-#include "include/fixed_generator.hpp"
+#include "fixed_generator.hpp"
 #include <stdexcept>
 
 namespace rybench {

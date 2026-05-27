@@ -1,4 +1,4 @@
-#include "include/schema_guided_generator.hpp"
+#include "schema_guided_generator.hpp"
 #include <chrono>
 
 namespace rybench {

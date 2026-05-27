@@ -1,4 +1,4 @@
-#include "serializer_factory.hpp"
+#include <rybench/serializer/serializer_factory.hpp>
 #include "json_serializer.hpp"
 #include "protobuf_serializer.hpp"
 #include "flatbuffers_serializer.hpp"

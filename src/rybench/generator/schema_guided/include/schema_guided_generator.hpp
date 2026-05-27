@@ -1,7 +1,7 @@
 #pragma once
 
-#include "generator.hpp"
-#include "reflection_builder.hpp"
+#include <rybench/generator/generator.hpp>
+#include <rybench/generator/reflection_builder.hpp>
 #include <random>
 #include <cstdint>
 #include <memory>
@@ -9,7 +9,7 @@
 namespace rybench {
 namespace generator {
 
-class SchemaGuidedGenerator : public IGenerator {
+class SchemaGuidedGenerator : public Generator {
 public:
     explicit SchemaGuidedGenerator(uint64_t seed = 0);
 
