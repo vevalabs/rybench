@@ -11,11 +11,10 @@ class FlatbuffersSerializer : public Serializer {
 public:
     FlatbuffersSerializer() = default;
 
-    std::span<const uint8_t> serialize(const core::Message& msg) override;
     std::string name() const override;
+    core::MessageFormat format() const override;
+    std::span<const uint8_t> serialize(const core::Message& msg) override;
 
-private:
-    std::vector<uint8_t> buffer_;
 };
 
 } // namespace rybench::serializer

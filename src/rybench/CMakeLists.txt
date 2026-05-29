@@ -45,10 +45,9 @@ add_library(rybench STATIC
     core/flatbuffers_schema.cpp
     # Generator
     generator/fixed/fixed_generator.cpp
-    generator/schema_guided/schema_guided_generator.cpp
-    generator/property_guided/property_guided_generator.cpp
+    generator/schema_guided/schema_guided_random_generator.cpp
     generator/generator_factory.cpp
-    generator/reflection_builder.cpp
+    generator/schema_guided/reflection_builder.cpp
     # Serializer
     serializer/json/json_serializer.cpp
     serializer/protobuf/protobuf_serializer.cpp
@@ -74,3 +73,13 @@ target_link_libraries(rybench PUBLIC
     ${Protobuf_LIBRARIES}
     flatbuffers
 )
+
+option(RYBENCH_ENABLE_FLATBUFFERS "Enable FlatBuffers format support" ON)
+option(RYBENCH_ENABLE_JSON        "Enable JSON format support"        ON)
+option(RYBENCH_ENABLE_PROTOBUF    "Enable Protobuf format support"    ON)
+
+foreach(fmt FLATBUFFERS JSON PROTOBUF)
+    if(RYBENCH_ENABLE_${fmt})
+        target_compile_definitions(rybench PUBLIC RYBENCH_ENABLE_${fmt})
+    endif()
+endforeach()

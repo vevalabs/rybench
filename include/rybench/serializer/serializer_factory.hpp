@@ -7,6 +7,7 @@
 
 namespace rybench::serializer {
 
-std::expected<SerializerPtr, std::string> createSerializer(const core::Config& config);
+std::expected<SerializerPtr, std::string> createSerializer(const core::Config& config,
+                                                              std::string_view type);
 
 } // namespace rybench::serializer

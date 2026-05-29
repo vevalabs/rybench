@@ -7,6 +7,7 @@ namespace rybench::serializer {
 
 ProtobufSerializer::ProtobufSerializer(const std::string& bfbsPath)
     : factory_(&pool_) {
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
     if (bfbsPath.empty()) {
         throw std::runtime_error("ProtobufSerializer requires a bfbs schema path");
     }
@@ -19,13 +20,60 @@ ProtobufSerializer::ProtobufSerializer(const std::string& bfbsPath)
     }
 
     buildDescriptorFromBfbs(fbSchema);
+#endif
 }
 
 std::string ProtobufSerializer::name() const {
     return "protobuf";
 }
 
-// Helper to extract simple name from fully qualified name (e.g., "benchmark.Packet" -> "Packet")
+core::MessageFormat ProtobufSerializer::format() const {
+    return core::MessageFormat::Protobuf;
+}
+
+std::span<const uint8_t> ProtobufSerializer::serialize(const core::Message& msg) {
+    if (msg.format() == core::MessageFormat::Protobuf) {
+        return msg.bytes();
+    }
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
+    if (msg.format() == core::MessageFormat::FlatBuffers) {
+        if (msg.empty()) {
+            buffer_.clear();
+            return buffer_;
+        }
+
+        const reflection::Schema* fbSchema = msg.schema();
+        if (!fbSchema) {
+            fbSchema = fbsSchema_.reflectionSchema();
+        }
+        if (!fbSchema || !fbSchema->root_table()) {
+            throw std::runtime_error("No FlatBuffers schema available for conversion");
+        }
+        if (!rootDescriptor_) {
+            throw std::runtime_error("No Protobuf descriptor available");
+        }
+
+        std::unique_ptr<google::protobuf::Message> protoMsg(
+            factory_.GetPrototype(rootDescriptor_)->New());
+
+        auto* fbTable = flatbuffers::GetAnyRoot(msg.data());
+        populateFromFlatBuffer(protoMsg.get(), fbTable, fbSchema->root_table());
+
+        const std::size_t n = static_cast<std::size_t>(protoMsg->ByteSizeLong());
+        buffer_.resize(n);
+        if (!protoMsg->SerializeToArray(buffer_.data(), static_cast<int>(n))) {
+            buffer_.clear();
+        }
+        return buffer_;
+    }
+#endif
+    throw std::runtime_error(
+        std::string("Unsupported conversion: ")
+        + std::string(core::toString(msg.format()))
+        + " -> protobuf");
+}
+
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
 static std::string getSimpleName(const std::string& fullName) {
     auto pos = fullName.rfind('.');
     if (pos != std::string::npos) {
@@ -34,7 +82,6 @@ static std::string getSimpleName(const std::string& fullName) {
     return fullName;
 }
 
-// Helper to extract package name from fully qualified name (e.g., "benchmark.Packet" -> "benchmark")
 static std::string getPackageName(const std::string& fullName) {
     auto pos = fullName.rfind('.');
     if (pos != std::string::npos) {
@@ -52,7 +99,6 @@ void ProtobufSerializer::buildDescriptorFromBfbs(const reflection::Schema* fbSch
         throw std::runtime_error("FlatBuffers schema has no objects");
     }
 
-    // Extract package name from root table
     std::string packageName;
     if (fbSchema->root_table()) {
         packageName = getPackageName(fbSchema->root_table()->name()->str());
@@ -61,7 +107,6 @@ void ProtobufSerializer::buildDescriptorFromBfbs(const reflection::Schema* fbSch
         }
     }
 
-    // First pass: add all enums
     if (fbSchema->enums()) {
         for (const auto* fbEnum : *fbSchema->enums()) {
             auto* enumProto = fileProto.add_enum_type();
@@ -77,13 +122,7 @@ void ProtobufSerializer::buildDescriptorFromBfbs(const reflection::Schema* fbSch
         }
     }
 
-    // Second pass: add all message types
     for (const auto* obj : *fbSchema->objects()) {
-        // Skip structs (is_struct = true), only process tables
-        if (obj->is_struct()) {
-            // For structs, we still create a message type
-        }
-
         auto* msgProto = fileProto.add_message_type();
         msgProto->set_name(getSimpleName(obj->name()->str()));
 
@@ -91,18 +130,15 @@ void ProtobufSerializer::buildDescriptorFromBfbs(const reflection::Schema* fbSch
             for (const auto* field : *obj->fields()) {
                 auto* fieldProto = msgProto->add_field();
                 fieldProto->set_name(field->name()->str());
-                // Protobuf field numbers are 1-based, use id + 1
                 fieldProto->set_number(field->id() + 1);
 
                 auto baseType = field->type()->base_type();
                 auto elemType = field->type()->element();
 
-                // Handle vectors (repeated fields)
                 if (baseType == reflection::BaseType::Vector) {
                     fieldProto->set_label(google::protobuf::FieldDescriptorProto::LABEL_REPEATED);
 
                     if (elemType == reflection::BaseType::Obj) {
-                        // Vector of objects - reference the nested type
                         fieldProto->set_type(google::protobuf::FieldDescriptorProto::TYPE_MESSAGE);
                         if (field->type()->index() >= 0) {
                             auto* nestedObj = fbSchema->objects()->Get(field->type()->index());
@@ -111,31 +147,25 @@ void ProtobufSerializer::buildDescriptorFromBfbs(const reflection::Schema* fbSch
                     } else {
                         fieldProto->set_type(mapFbTypeToProtoType(elemType));
                     }
-                }
-                // Handle nested objects
-                else if (baseType == reflection::BaseType::Obj) {
+                } else if (baseType == reflection::BaseType::Obj) {
                     fieldProto->set_label(google::protobuf::FieldDescriptorProto::LABEL_OPTIONAL);
                     fieldProto->set_type(google::protobuf::FieldDescriptorProto::TYPE_MESSAGE);
                     if (field->type()->index() >= 0) {
                         auto* nestedObj = fbSchema->objects()->Get(field->type()->index());
                         fieldProto->set_type_name(getSimpleName(nestedObj->name()->str()));
                     }
-                }
-                // Handle enums (stored as Byte/UByte/Short/etc with index >= 0)
-                else if (field->type()->index() >= 0 && fbSchema->enums() &&
-                         (baseType == reflection::BaseType::Byte ||
-                          baseType == reflection::BaseType::UByte ||
-                          baseType == reflection::BaseType::Short ||
-                          baseType == reflection::BaseType::UShort ||
-                          baseType == reflection::BaseType::Int ||
-                          baseType == reflection::BaseType::UInt)) {
+                } else if (field->type()->index() >= 0 && fbSchema->enums() &&
+                           (baseType == reflection::BaseType::Byte ||
+                            baseType == reflection::BaseType::UByte ||
+                            baseType == reflection::BaseType::Short ||
+                            baseType == reflection::BaseType::UShort ||
+                            baseType == reflection::BaseType::Int ||
+                            baseType == reflection::BaseType::UInt)) {
                     fieldProto->set_label(google::protobuf::FieldDescriptorProto::LABEL_OPTIONAL);
                     fieldProto->set_type(google::protobuf::FieldDescriptorProto::TYPE_ENUM);
                     auto* enumDef = fbSchema->enums()->Get(field->type()->index());
                     fieldProto->set_type_name(getSimpleName(enumDef->name()->str()));
-                }
-                // Handle scalar types
-                else {
+                } else {
                     fieldProto->set_label(google::protobuf::FieldDescriptorProto::LABEL_OPTIONAL);
                     fieldProto->set_type(mapFbTypeToProtoType(baseType));
                 }
@@ -143,16 +173,13 @@ void ProtobufSerializer::buildDescriptorFromBfbs(const reflection::Schema* fbSch
         }
     }
 
-    // Build the file descriptor
     const google::protobuf::FileDescriptor* fileDesc = pool_.BuildFile(fileProto);
     if (!fileDesc) {
         throw std::runtime_error("Failed to build Protobuf descriptor from FlatBuffers schema");
     }
 
-    // Get the root table descriptor (use fully qualified name with package)
     if (fbSchema->root_table()) {
         std::string rootName = fbSchema->root_table()->name()->str();
-        // Convert FlatBuffers namespace (dots) to fully qualified protobuf name
         rootDescriptor_ = pool_.FindMessageTypeByName(rootName);
         if (!rootDescriptor_) {
             throw std::runtime_error("Failed to find root message type: " + rootName);
@@ -163,32 +190,19 @@ void ProtobufSerializer::buildDescriptorFromBfbs(const reflection::Schema* fbSch
 google::protobuf::FieldDescriptorProto::Type ProtobufSerializer::mapFbTypeToProtoType(
     reflection::BaseType fbType) const {
     switch (fbType) {
-        case reflection::BaseType::Bool:
-            return google::protobuf::FieldDescriptorProto::TYPE_BOOL;
-        case reflection::BaseType::Byte:
-            return google::protobuf::FieldDescriptorProto::TYPE_INT32;
-        case reflection::BaseType::UByte:
-            return google::protobuf::FieldDescriptorProto::TYPE_UINT32;
-        case reflection::BaseType::Short:
-            return google::protobuf::FieldDescriptorProto::TYPE_INT32;
-        case reflection::BaseType::UShort:
-            return google::protobuf::FieldDescriptorProto::TYPE_UINT32;
-        case reflection::BaseType::Int:
-            return google::protobuf::FieldDescriptorProto::TYPE_INT32;
-        case reflection::BaseType::UInt:
-            return google::protobuf::FieldDescriptorProto::TYPE_UINT32;
-        case reflection::BaseType::Long:
-            return google::protobuf::FieldDescriptorProto::TYPE_INT64;
-        case reflection::BaseType::ULong:
-            return google::protobuf::FieldDescriptorProto::TYPE_UINT64;
-        case reflection::BaseType::Float:
-            return google::protobuf::FieldDescriptorProto::TYPE_FLOAT;
-        case reflection::BaseType::Double:
-            return google::protobuf::FieldDescriptorProto::TYPE_DOUBLE;
-        case reflection::BaseType::String:
-            return google::protobuf::FieldDescriptorProto::TYPE_STRING;
-        default:
-            return google::protobuf::FieldDescriptorProto::TYPE_BYTES;
+        case reflection::BaseType::Bool:   return google::protobuf::FieldDescriptorProto::TYPE_BOOL;
+        case reflection::BaseType::Byte:   return google::protobuf::FieldDescriptorProto::TYPE_INT32;
+        case reflection::BaseType::UByte:  return google::protobuf::FieldDescriptorProto::TYPE_UINT32;
+        case reflection::BaseType::Short:  return google::protobuf::FieldDescriptorProto::TYPE_INT32;
+        case reflection::BaseType::UShort: return google::protobuf::FieldDescriptorProto::TYPE_UINT32;
+        case reflection::BaseType::Int:    return google::protobuf::FieldDescriptorProto::TYPE_INT32;
+        case reflection::BaseType::UInt:   return google::protobuf::FieldDescriptorProto::TYPE_UINT32;
+        case reflection::BaseType::Long:   return google::protobuf::FieldDescriptorProto::TYPE_INT64;
+        case reflection::BaseType::ULong:  return google::protobuf::FieldDescriptorProto::TYPE_UINT64;
+        case reflection::BaseType::Float:  return google::protobuf::FieldDescriptorProto::TYPE_FLOAT;
+        case reflection::BaseType::Double: return google::protobuf::FieldDescriptorProto::TYPE_DOUBLE;
+        case reflection::BaseType::String: return google::protobuf::FieldDescriptorProto::TYPE_STRING;
+        default:                           return google::protobuf::FieldDescriptorProto::TYPE_BYTES;
     }
 }
 
@@ -198,37 +212,6 @@ google::protobuf::FieldDescriptorProto::Label ProtobufSerializer::getProtoLabel(
         return google::protobuf::FieldDescriptorProto::LABEL_REPEATED;
     }
     return google::protobuf::FieldDescriptorProto::LABEL_OPTIONAL;
-}
-
-std::span<const uint8_t> ProtobufSerializer::serialize(const core::Message& msg) {
-    if (msg.empty()) {
-        buffer_.clear();
-        return buffer_;
-    }
-
-    const reflection::Schema* fbSchema = msg.schema();
-    if (!fbSchema) {
-        fbSchema = fbsSchema_.reflectionSchema();
-    }
-    if (!fbSchema || !fbSchema->root_table()) {
-        throw std::runtime_error("No FlatBuffers schema available for conversion");
-    }
-    if (!rootDescriptor_) {
-        throw std::runtime_error("No Protobuf descriptor available");
-    }
-
-    std::unique_ptr<google::protobuf::Message> protoMsg(
-        factory_.GetPrototype(rootDescriptor_)->New());
-
-    auto* fbTable = flatbuffers::GetAnyRoot(msg.data());
-    populateFromFlatBuffer(protoMsg.get(), fbTable, fbSchema->root_table());
-
-    const std::size_t n = static_cast<std::size_t>(protoMsg->ByteSizeLong());
-    buffer_.resize(n);
-    if (!protoMsg->SerializeToArray(buffer_.data(), static_cast<int>(n))) {
-        buffer_.clear();
-    }
-    return buffer_;
 }
 
 void ProtobufSerializer::populateFromFlatBuffer(google::protobuf::Message* protoMsg,
@@ -242,13 +225,11 @@ void ProtobufSerializer::populateFromFlatBuffer(google::protobuf::Message* proto
 
     if (!fbObj->fields()) return;
 
-    // Iterate through FlatBuffer fields and map to Protobuf
     for (const auto* fbField : *fbObj->fields()) {
         std::string fieldName = fbField->name()->str();
 
         const auto* protoField = protoDesc->FindFieldByName(fieldName);
         if (!protoField) {
-            // Try lowercase version
             std::string lowerName = fieldName;
             for (auto& c : lowerName) c = std::tolower(c);
             protoField = protoDesc->FindFieldByName(lowerName);
@@ -269,12 +250,10 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
     auto fbBaseType = fbField->type()->base_type();
 
     if (protoField->is_repeated()) {
-        // Handle repeated fields (arrays/vectors)
         if (fbBaseType == reflection::BaseType::Vector) {
             auto elemType = fbField->type()->element();
 
             if (elemType == reflection::BaseType::Obj) {
-                // Vector of messages
                 auto* vec = fbTable->GetPointer<const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::Table>>*>(fbField->offset());
                 if (vec && fbField->type()->index() >= 0 && fbSchema) {
                     auto* elemObj = fbSchema->objects()->Get(fbField->type()->index());
@@ -291,7 +270,6 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
                     }
                 }
             } else {
-                // Vector of scalars
                 switch (elemType) {
                     case reflection::BaseType::Int: {
                         auto* vec = fbTable->GetPointer<const flatbuffers::Vector<int32_t>*>(fbField->offset());
@@ -329,7 +307,6 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
             }
         }
     } else {
-        // Handle singular fields
         switch (fbBaseType) {
             case reflection::BaseType::Bool:
                 protoRefl->SetBool(protoMsg, protoField, fbTable->GetField<uint8_t>(fbField->offset(), 0) != 0);
@@ -395,5 +372,6 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
         }
     }
 }
+#endif // RYBENCH_ENABLE_FLATBUFFERS
 
 } // namespace rybench::serializer

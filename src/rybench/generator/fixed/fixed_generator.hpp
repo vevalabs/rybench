@@ -1,6 +1,7 @@
 #pragma once
 
 #include <rybench/generator/generator.hpp>
+#include <rybench/serializer/serializer.hpp>
 #include <fstream>
 #include <string>
 
@@ -8,7 +9,7 @@ namespace rybench::generator {
 
 class FixedGenerator : public Generator {
 public:
-    FixedGenerator() = default;
+    explicit FixedGenerator(serializer::Serializer& backend);
     ~FixedGenerator();
 
     void loadSchema(const core::FlatBuffersSchema& schema) override;
@@ -17,6 +18,7 @@ public:
     std::string name() const override;
 
 private:
+    serializer::Serializer& backend_;
     const core::FlatBuffersSchema* schema_ = nullptr;
     std::ifstream file_;
     bool finished_ = false;

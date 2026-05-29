@@ -3,6 +3,9 @@
 
 namespace rybench::generator {
 
+FixedGenerator::FixedGenerator(serializer::Serializer& backend)
+    : backend_(backend) {}
+
 FixedGenerator::~FixedGenerator() {
     if (file_.is_open()) {
         file_.close();
@@ -26,28 +29,27 @@ void FixedGenerator::loadDump(const std::string& filepath) {
 }
 
 core::Message FixedGenerator::generate() {
-    // If we've reached EOF, repeat the last message indefinitely
     if (finished_) {
         return lastMessage_;
     }
 
-    // Read binary FlatBuffers message from file
     // Format: 4 bytes size (little-endian) + size bytes data
     uint32_t msgSize = 0;
     if (!file_.read(reinterpret_cast<char*>(&msgSize), sizeof(msgSize))) {
         finished_ = true;
-        // Return last cached message (repeats indefinitely)
         return lastMessage_;
     }
 
     std::vector<uint8_t> buffer(msgSize);
     if (!file_.read(reinterpret_cast<char*>(buffer.data()), msgSize)) {
         finished_ = true;
-        // Return last cached message (repeats indefinitely)
         return lastMessage_;
     }
 
-    lastMessage_ = core::Message(std::move(buffer), schema_ ? schema_->reflectionSchema() : nullptr);
+    // TODO: preload replay dump once, store message offsets, and return borrowed spans
+    // into the preloaded buffer for zero-copy replay.
+    lastMessage_ = core::Message(std::move(buffer), backend_.format(),
+                                  schema_ ? schema_->reflectionSchema() : nullptr);
     return lastMessage_;
 }
 

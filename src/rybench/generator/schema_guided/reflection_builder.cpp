@@ -1,4 +1,4 @@
-#include <rybench/generator/reflection_builder.hpp>
+#include "reflection_builder.hpp"
 #include <chrono>
 #include <algorithm>
 #include <cstring>
@@ -28,7 +28,7 @@ core::Message ReflectionBuilder::build(std::mt19937_64& rng) {
     auto size = builder.GetSize();
 
     std::vector<uint8_t> buffer(buf, buf + size);
-    return core::Message(std::move(buffer), schema_.reflectionSchema());
+    return core::Message(std::move(buffer), core::MessageFormat::FlatBuffers, schema_.reflectionSchema());
 }
 
 void ReflectionBuilder::setIntGenerator(const std::string& fieldPath, ScalarGenerator gen) {

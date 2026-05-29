@@ -12,21 +12,32 @@ Engine::Engine(const Config& config, std::atomic<bool>& running)
     : config_(config), running_(running) {}
 
 int Engine::run(transport::Publisher& publisher) {
-    auto genResult = rybench::generator::createGenerator(config_);
+    auto genSerResult = rybench::serializer::createSerializer(
+        config_, config_.get("generator", "backend", "flatbuffers"));
+    if (!genSerResult) {
+        std::cerr << "Failed to create generation serializer: " << genSerResult.error() << "\n";
+        return 1;
+    }
+    auto genSer = std::move(*genSerResult);
+
+    auto outSerResult = rybench::serializer::createSerializer(
+        config_, config_.get("serializer", "type", "flatbuffers"));
+    if (!outSerResult) {
+        std::cerr << "Failed to create output serializer: " << outSerResult.error() << "\n";
+        return 1;
+    }
+    auto outSer = std::move(*outSerResult);
+
+    auto genResult = rybench::generator::createGenerator(config_, *genSer);
     if (!genResult) {
         std::cerr << "Failed to create generator: " << genResult.error() << "\n";
         return 1;
     }
     auto gen = std::move(*genResult);
-    std::cout << "Generator: " << gen->name() << "\n";
 
-    auto serResult = rybench::serializer::createSerializer(config_);
-    if (!serResult) {
-        std::cerr << "Failed to create serializer: " << serResult.error() << "\n";
-        return 1;
-    }
-    auto ser = std::move(*serResult);
-    std::cout << "Serializer: " << ser->name() << "\n";
+    std::cout << "Generator:          " << gen->name() << "\n";
+    std::cout << "Generation backend: " << genSer->name() << "\n";
+    std::cout << "Output serializer:  " << outSer->name() << "\n";
 
     if (auto result = publisher.init(config_); !result) {
         std::cerr << result.error() << "\n";
@@ -43,7 +54,7 @@ int Engine::run(transport::Publisher& publisher) {
             std::cout << "Generated empty message, skipping.\n";
             continue;
         }
-        auto serialized = ser->serialize(msg);
+        auto serialized = outSer->serialize(msg);
         if (publisher.publish(serialized.data(), serialized.size())) {
             if (++messageCount % 100 == 0)
                 std::cout << "Published " << messageCount << " messages\n";

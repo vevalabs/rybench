@@ -1,10 +1,13 @@
 #include "json_serializer.hpp"
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
 #include <flatbuffers/flatbuffers.h>
+#endif
 #include <iostream>
 
 namespace rybench::serializer {
 
 JsonSerializer::JsonSerializer(const std::string& bfbsPath) {
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
     if (!bfbsPath.empty()) {
         try {
             fbsSchema_.loadFromBfbs(bfbsPath);
@@ -12,21 +15,38 @@ JsonSerializer::JsonSerializer(const std::string& bfbsPath) {
             std::cerr << "Warning: Failed to load bfbs schema: " << e.what() << std::endl;
         }
     }
+#endif
 }
 
 std::string JsonSerializer::name() const {
     return "json";
 }
 
-std::span<const uint8_t> JsonSerializer::serialize(const core::Message& msg) {
-    rapidjson::StringBuffer strbuf;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
-    flatbufferToJson(writer, msg);
-    const auto* str = reinterpret_cast<const uint8_t*>(strbuf.GetString());
-    buffer_.assign(str, str + strbuf.GetSize());
-    return buffer_;
+core::MessageFormat JsonSerializer::format() const {
+    return core::MessageFormat::Json;
 }
 
+std::span<const uint8_t> JsonSerializer::serialize(const core::Message& msg) {
+    if (msg.format() == core::MessageFormat::Json) {
+        return msg.bytes();
+    }
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
+    if (msg.format() == core::MessageFormat::FlatBuffers) {
+        rapidjson::StringBuffer strbuf;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
+        flatbufferToJson(writer, msg);
+        const auto* str = reinterpret_cast<const uint8_t*>(strbuf.GetString());
+        buffer_.assign(str, str + strbuf.GetSize());
+        return buffer_;
+    }
+#endif
+    throw std::runtime_error(
+        std::string("Unsupported conversion: ")
+        + std::string(core::toString(msg.format()))
+        + " -> json");
+}
+
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
 void JsonSerializer::flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const core::Message& msg) {
     if (msg.empty()) {
         writer.StartObject();
@@ -140,7 +160,6 @@ void JsonSerializer::valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& wri
                     }
                 }
             } else {
-                // Scalar vectors
                 switch (elementType) {
                     case reflection::BaseType::Int: {
                         auto* vec = table->GetPointer<const flatbuffers::Vector<int32_t>*>(field->offset());
@@ -184,5 +203,6 @@ void JsonSerializer::valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& wri
             break;
     }
 }
+#endif // RYBENCH_ENABLE_FLATBUFFERS
 
 } // namespace rybench::serializer
