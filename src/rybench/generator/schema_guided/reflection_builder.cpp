@@ -13,12 +13,12 @@ core::Message ReflectionBuilder::build(const Samplers& samplers) {
 
     samplers_ = &samplers;
 
-    flatbuffers::FlatBufferBuilder builder(1024);
-    auto rootOffset = buildTable(builder, rootTable, schema_.fields(), "");
-    builder.Finish(flatbuffers::Offset<flatbuffers::Table>(rootOffset.o));
+    builder_.Clear();
+    auto rootOffset = buildTable(builder_, rootTable, schema_.fields(), "");
+    builder_.Finish(flatbuffers::Offset<flatbuffers::Table>(rootOffset.o));
 
-    auto* buf = builder.GetBufferPointer();
-    auto size = builder.GetSize();
+    auto* buf = builder_.GetBufferPointer();
+    auto size = builder_.GetSize();
     std::vector<uint8_t> buffer(buf, buf + size);
 
     samplers_ = nullptr;

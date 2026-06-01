@@ -27,6 +27,7 @@ public:
 private:
     const core::FlatBuffersSchema& schema_;
     const Samplers* samplers_ = nullptr;
+    flatbuffers::FlatBufferBuilder builder_{1024};
 
     flatbuffers::Offset<void> buildTable(
         flatbuffers::FlatBufferBuilder& builder,
