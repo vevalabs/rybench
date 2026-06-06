@@ -38,11 +38,8 @@ void Config::validate() {
         }
     }
 
-    // Load FlatBuffers schema from .bfbs file
-    std::string bfbsPath = get("schema", "bfbs", "schemas/benchmark.bfbs");
-    schema_.loadFromBfbs(bfbsPath);
-
-    std::cout << "Schema: " << schema_.rootTableName() << std::endl;
+    schemaPath_ = get("schema", "bfbs", "schemas/benchmark.bfbs");
+    std::cout << "Schema: " << schemaPath_ << std::endl;
 }
 
 void Config::loadNode(const std::string& configRoot, const std::string& nodeName) {

@@ -42,15 +42,14 @@ add_library(rybench STATIC
     # Core
     core/config.cpp
     core/message.cpp
-    core/flatbuffers_schema.cpp
     # Generator
     generator/fixed/fixed_generator.cpp
     generator/schema_guided/schema_guided_random_generator.cpp
     generator/generator_factory.cpp
-    generator/schema_guided/reflection_builder.cpp
     # Serializer
     serializer/json/json_serializer.cpp
     serializer/protobuf/protobuf_serializer.cpp
+    serializer/flatbuffers/flatbuffers_schema.cpp
     serializer/flatbuffers/flatbuffers_serializer.cpp
     serializer/serializer_factory.cpp
     # Transport engine (transport-agnostic publish/consume loop)

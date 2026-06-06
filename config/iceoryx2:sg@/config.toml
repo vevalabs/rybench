@@ -1,0 +1,21 @@
+[runtime]
+app_name = "bench_ice_sg_%i"
+
+[schema]
+bfbs = "schemas/osi_sensorview.bfbs"
+
+[generator]
+algorithm = "schema_guided"
+seed = 1
+
+[serializer]
+type = "flatbuffers"
+
+[iceoryx2]
+mode = "publish"
+service = "Benchmark"
+instance = "Default"
+event = "Data"
+max_payload_size = 8192
+rate_hz = 100000
+output = "dump/iceoryx2-%i-received.bin"

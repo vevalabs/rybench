@@ -1,0 +1,17 @@
+[runtime]
+app_name = "bench_sg_%i"
+
+[schema]
+bfbs = "schemas/osi_sensorview.bfbs"
+
+[generator]
+algorithm = "schema_guided"
+seed = 1
+
+[serializer]
+type = "flatbuffers"
+
+[filewriter]
+output = "/dev/null"
+rate_hz = 100000
+count = 0

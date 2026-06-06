@@ -12,7 +12,7 @@ FixedGenerator::~FixedGenerator() {
     }
 }
 
-void FixedGenerator::loadSchema(const core::FlatBuffersSchema& schema) {
+void FixedGenerator::loadSchema(const core::SchemaDefinition& schema) {
     schema_ = &schema;
 
     if (!file_.is_open()) {
@@ -48,8 +48,7 @@ core::Message FixedGenerator::generate() {
 
     // TODO: preload replay dump once, store message offsets, and return borrowed spans
     // into the preloaded buffer for zero-copy replay.
-    lastMessage_ = core::Message(std::move(buffer), backend_.format(),
-                                  schema_ ? schema_->reflectionSchema() : nullptr);
+    lastMessage_ = core::Message(std::move(buffer), backend_.format());
     return lastMessage_;
 }
 

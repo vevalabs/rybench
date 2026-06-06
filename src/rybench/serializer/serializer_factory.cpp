@@ -28,7 +28,7 @@ std::expected<SerializerPtr, std::string> createSerializer(const core::Config& c
 #endif
 #ifdef RYBENCH_ENABLE_FLATBUFFERS
         if (type == "flatbuffers") {
-            return std::make_unique<FlatbuffersSerializer>();
+            return std::make_unique<FlatbuffersSerializer>(bfbsPath);
         }
 #endif
         return std::unexpected("Unknown or disabled serializer type: " + std::string(type));

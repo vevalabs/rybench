@@ -12,14 +12,14 @@ public:
     explicit FixedGenerator(serializer::Serializer& backend);
     ~FixedGenerator();
 
-    void loadSchema(const core::FlatBuffersSchema& schema) override;
+    void loadSchema(const core::SchemaDefinition& schema) override;
     void loadDump(const std::string& filepath);
     core::Message generate() override;
     std::string name() const override;
 
 private:
     serializer::Serializer& backend_;
-    const core::FlatBuffersSchema* schema_ = nullptr;
+    const core::SchemaDefinition* schema_ = nullptr;
     std::ifstream file_;
     bool finished_ = false;
     core::Message lastMessage_;  // Cached for indefinite replay

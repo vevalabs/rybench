@@ -374,4 +374,20 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
 }
 #endif // RYBENCH_ENABLE_FLATBUFFERS
 
+void ProtobufSerializer::loadSchema(const core::SchemaDefinition&) {}
+void ProtobufSerializer::initMessage() {}
+void ProtobufSerializer::addBool  (const core::SchemaField&, bool) {}
+void ProtobufSerializer::addInt   (const core::SchemaField&, int64_t) {}
+void ProtobufSerializer::addUInt  (const core::SchemaField&, uint64_t) {}
+void ProtobufSerializer::addFloat (const core::SchemaField&, float) {}
+void ProtobufSerializer::addDouble(const core::SchemaField&, double) {}
+void ProtobufSerializer::addString(const core::SchemaField&, std::string_view) {}
+void ProtobufSerializer::beginTable (const core::SchemaField&) {}
+void ProtobufSerializer::endTable   () {}
+void ProtobufSerializer::beginVector(const core::SchemaField&, size_t) {}
+void ProtobufSerializer::endVector  () {}
+core::Message ProtobufSerializer::finalizeMessage() {
+    throw std::runtime_error("ProtobufSerializer::finalizeMessage: builder API not yet implemented");
+}
+
 } // namespace rybench::serializer

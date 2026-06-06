@@ -1,4 +1,5 @@
 #include "json_serializer.hpp"
+#include <stdexcept>
 #ifdef RYBENCH_ENABLE_FLATBUFFERS
 #include <flatbuffers/flatbuffers.h>
 #endif
@@ -204,5 +205,21 @@ void JsonSerializer::valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& wri
     }
 }
 #endif // RYBENCH_ENABLE_FLATBUFFERS
+
+void JsonSerializer::loadSchema(const core::SchemaDefinition&) {}
+void JsonSerializer::initMessage() {}
+void JsonSerializer::addBool  (const core::SchemaField&, bool) {}
+void JsonSerializer::addInt   (const core::SchemaField&, int64_t) {}
+void JsonSerializer::addUInt  (const core::SchemaField&, uint64_t) {}
+void JsonSerializer::addFloat (const core::SchemaField&, float) {}
+void JsonSerializer::addDouble(const core::SchemaField&, double) {}
+void JsonSerializer::addString(const core::SchemaField&, std::string_view) {}
+void JsonSerializer::beginTable (const core::SchemaField&) {}
+void JsonSerializer::endTable   () {}
+void JsonSerializer::beginVector(const core::SchemaField&, size_t) {}
+void JsonSerializer::endVector  () {}
+core::Message JsonSerializer::finalizeMessage() {
+    throw std::runtime_error("JsonSerializer::finalizeMessage: builder API not yet implemented");
+}
 
 } // namespace rybench::serializer
