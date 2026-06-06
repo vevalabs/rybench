@@ -1,10 +1,14 @@
 #include "json_serializer.hpp"
+#include <stdexcept>
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
 #include <flatbuffers/flatbuffers.h>
+#endif
 #include <iostream>
 
 namespace rybench::serializer {
 
 JsonSerializer::JsonSerializer(const std::string& bfbsPath) {
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
     if (!bfbsPath.empty()) {
         try {
             fbsSchema_.loadFromBfbs(bfbsPath);
@@ -12,21 +16,38 @@ JsonSerializer::JsonSerializer(const std::string& bfbsPath) {
             std::cerr << "Warning: Failed to load bfbs schema: " << e.what() << std::endl;
         }
     }
+#endif
 }
 
 std::string JsonSerializer::name() const {
     return "json";
 }
 
-std::span<const uint8_t> JsonSerializer::serialize(const core::Message& msg) {
-    rapidjson::StringBuffer strbuf;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
-    flatbufferToJson(writer, msg);
-    const auto* str = reinterpret_cast<const uint8_t*>(strbuf.GetString());
-    buffer_.assign(str, str + strbuf.GetSize());
-    return buffer_;
+core::MessageFormat JsonSerializer::format() const {
+    return core::MessageFormat::Json;
 }
 
+std::span<const uint8_t> JsonSerializer::serialize(const core::Message& msg) {
+    if (msg.format() == core::MessageFormat::Json) {
+        return msg.bytes();
+    }
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
+    if (msg.format() == core::MessageFormat::FlatBuffers) {
+        rapidjson::StringBuffer strbuf;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
+        flatbufferToJson(writer, msg);
+        const auto* str = reinterpret_cast<const uint8_t*>(strbuf.GetString());
+        buffer_.assign(str, str + strbuf.GetSize());
+        return buffer_;
+    }
+#endif
+    throw std::runtime_error(
+        std::string("Unsupported conversion: ")
+        + std::string(core::toString(msg.format()))
+        + " -> json");
+}
+
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
 void JsonSerializer::flatbufferToJson(rapidjson::Writer<rapidjson::StringBuffer>& writer, const core::Message& msg) {
     if (msg.empty()) {
         writer.StartObject();
@@ -140,7 +161,6 @@ void JsonSerializer::valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& wri
                     }
                 }
             } else {
-                // Scalar vectors
                 switch (elementType) {
                     case reflection::BaseType::Int: {
                         auto* vec = table->GetPointer<const flatbuffers::Vector<int32_t>*>(field->offset());
@@ -183,6 +203,23 @@ void JsonSerializer::valueToJson(rapidjson::Writer<rapidjson::StringBuffer>& wri
             writer.Null();
             break;
     }
+}
+#endif // RYBENCH_ENABLE_FLATBUFFERS
+
+void JsonSerializer::loadSchema(const core::SchemaDefinition&) {}
+void JsonSerializer::initMessage() {}
+void JsonSerializer::addBool  (const core::SchemaField&, bool) {}
+void JsonSerializer::addInt   (const core::SchemaField&, int64_t) {}
+void JsonSerializer::addUInt  (const core::SchemaField&, uint64_t) {}
+void JsonSerializer::addFloat (const core::SchemaField&, float) {}
+void JsonSerializer::addDouble(const core::SchemaField&, double) {}
+void JsonSerializer::addString(const core::SchemaField&, std::string_view) {}
+void JsonSerializer::beginTable (const core::SchemaField&) {}
+void JsonSerializer::endTable   () {}
+void JsonSerializer::beginVector(const core::SchemaField&, size_t) {}
+void JsonSerializer::endVector  () {}
+core::Message JsonSerializer::finalizeMessage() {
+    throw std::runtime_error("JsonSerializer::finalizeMessage: builder API not yet implemented");
 }
 
 } // namespace rybench::serializer

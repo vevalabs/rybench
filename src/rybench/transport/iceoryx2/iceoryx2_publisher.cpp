@@ -80,12 +80,13 @@ bool Iceoryx2Publisher::publish(const void* data, std::size_t size) {
     }
 
     auto sample = std::move(loan_result.value());
-    const uint8_t* src = static_cast<const uint8_t*>(data);
 
-    auto initialized_sample =
-        sample.write_from_fn([&](std::size_t i) { return src[i]; });
+    // Bulk memcpy into the loaned shared-memory slice instead of a per-byte
+    // write_from_fn callback (which is ~1 µs/msg of pure copy overhead).
+    auto dest = sample.payload_mut();
+    std::memcpy(dest.data(), data, size);
 
-    auto send_result = send(std::move(initialized_sample));
+    auto send_result = send(assume_init(std::move(sample)));
     if (!send_result) {
         std::cerr << "[Iceoryx2] Send failed\n";
         return false;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <rybench/core/flatbuffers_schema.hpp>
 #include <string>
 #include <memory>
 
@@ -31,7 +30,7 @@ public:
     bool hasSection(const std::string& section) const;
     bool hasKey(const std::string& section, const std::string& key) const;
 
-    const FlatBuffersSchema& schema() const { return schema_; }
+    const std::string& schemaPath() const { return schemaPath_; }
     const std::string& instanceName() const { return instanceName_; }
 
 private:
@@ -41,7 +40,7 @@ private:
 
     struct Impl;
     std::unique_ptr<Impl> impl_;
-    FlatBuffersSchema schema_;
+    std::string schemaPath_;
     std::string instanceName_;
 };
 

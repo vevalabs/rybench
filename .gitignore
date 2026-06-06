@@ -3,6 +3,11 @@
 
 # Build artifacts
 build/
+build_debug/
+build_release/
+
+# Third-party runtime verification tools (large, vendored externally)
+rv-tools/
 
 # Tool-specific files
 CLAUDE.md

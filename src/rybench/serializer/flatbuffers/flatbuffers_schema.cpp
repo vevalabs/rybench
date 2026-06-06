@@ -1,4 +1,4 @@
-#include <rybench/core/flatbuffers_schema.hpp>
+#include "flatbuffers_schema.hpp"
 #include <fstream>
 #include <stdexcept>
 #include <algorithm>
@@ -35,6 +35,15 @@ void FlatBuffersSchema::loadFromBfbs(const std::vector<uint8_t>& bfbsData) {
     parseReflectionSchema();
 }
 
+std::string FlatBuffersSchema::attribute(const std::string& key) const {
+    if (!reflSchema_) return {};
+    auto* root = reflSchema_->root_table();
+    if (!root || !root->attributes()) return {};
+    auto* kv = root->attributes()->LookupByKey(key.c_str());
+    if (!kv || !kv->value()) return {};
+    return kv->value()->str();
+}
+
 const reflection::Object* FlatBuffersSchema::rootTable() const {
     if (!reflSchema_) {
         return nullptr;
@@ -48,7 +57,7 @@ void FlatBuffersSchema::parseReflectionSchema() {
     }
 
     auto* rootObj = reflSchema_->root_table();
-    rootTableName_ = rootObj->name()->str();
+    rootName_ = rootObj->name()->str();
 
     // Parse fields of the root table
     if (rootObj->fields()) {
@@ -58,11 +67,13 @@ void FlatBuffersSchema::parseReflectionSchema() {
     }
 }
 
-FbsSchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
-    FbsSchemaField sf;
-    sf.name = field->name()->str();
-    sf.fieldId = field->id();
+SchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
+    SchemaField sf;
+    sf.name      = field->name()->str();
+    sf.fieldId   = field->offset();   // vtable offset — used by FlatbuffersSerializer::AddElement
     sf.isRequired = field->required();
+    sf.defaultInt    = field->default_integer();
+    sf.defaultDouble = field->default_real();
 
     auto baseType = field->type()->base_type();
     sf.isVector = (baseType == reflection::BaseType::Vector);
@@ -84,7 +95,7 @@ FbsSchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
             }
         } else {
             // Vector of scalars
-            FbsSchemaField elementField;
+            SchemaField elementField;
             elementField.name = "element";
             elementField.type = baseTypeToFieldType(elementType);
             sf.children.push_back(elementField);
@@ -100,7 +111,32 @@ FbsSchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
             }
         }
     } else {
-        sf.type = baseTypeToFieldType(baseType);
+        // Detect enum: integer field whose type index points into the enums table
+        int32_t typeIdx = field->type()->index();
+        bool isIntBase = (baseType == reflection::BaseType::Byte   ||
+                          baseType == reflection::BaseType::UByte  ||
+                          baseType == reflection::BaseType::Short  ||
+                          baseType == reflection::BaseType::UShort ||
+                          baseType == reflection::BaseType::Int    ||
+                          baseType == reflection::BaseType::UInt   ||
+                          baseType == reflection::BaseType::Long   ||
+                          baseType == reflection::BaseType::ULong);
+
+        if (isIntBase && typeIdx >= 0 && reflSchema_->enums() &&
+            typeIdx < static_cast<int32_t>(reflSchema_->enums()->size())) {
+            sf.type = FbsFieldType::Enum;
+            sf.typeIndex = typeIdx;
+            auto* enumDef = reflSchema_->enums()->Get(typeIdx);
+            if (enumDef && enumDef->values()) {
+                for (auto i = 0u; i < enumDef->values()->size(); ++i) {
+                    auto* v = enumDef->values()->Get(i);
+                    sf.enumValues.push_back(v->name()->str());
+                    sf.enumNumericValues.push_back(v->value());
+                }
+            }
+        } else {
+            sf.type = baseTypeToFieldType(baseType);
+        }
     }
 
     // Parse constraints from attributes
@@ -109,8 +145,8 @@ FbsSchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
     return sf;
 }
 
-FbsSchemaField FlatBuffersSchema::parseObject(const reflection::Object* obj) {
-    FbsSchemaField sf;
+SchemaField FlatBuffersSchema::parseObject(const reflection::Object* obj) {
+    SchemaField sf;
     sf.name = obj->name()->str();
     sf.type = obj->is_struct() ? FbsFieldType::Struct : FbsFieldType::Table;
 
