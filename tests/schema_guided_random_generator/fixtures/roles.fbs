@@ -1,0 +1,40 @@
+namespace bench_test;
+
+// Attributes exercised by schema_guided_roles_test.
+attribute "generate";
+attribute "min";
+attribute "max";
+attribute "min_length";
+attribute "max_length";
+attribute "pattern";
+attribute "min_items";
+attribute "max_items";
+
+enum Color : byte { Red = 0, Green = 1, Blue = 2 }
+
+table Inner {
+  k:int (min: "5", max: "9");
+}
+
+table RoleEvent {
+  seq:ulong    (generate: "counter");                                   // 0,1,2,...
+  ts:ulong     (generate: "timestamp");                                 // wall-clock ms
+  value:int    (max: "100");                                            // constrained int
+  ratio:double (min: "-1.5", max: "2.5");                               // constrained double
+  temp:float   (min: "10.0", max: "20.0");                              // constrained float
+  label:string (min_length: "4", max_length: "8", pattern: "^[A-Z]+$"); // length + charset
+  color:Color;                                                          // enum
+  tags:[int]   (min_items: "2", max_items: "4");                        // vector
+  inner:Inner;                                                          // nested table
+
+  flag:bool;                                                            // bool -> 0/1
+  score:byte   (min: "-5",   max: "5");                                 // signed 8-bit
+  level:short  (min: "-100", max: "100");                               // signed 16-bit
+  big:long     (min: "1000", max: "2000");                              // signed 64-bit
+  count:uint   (min: "10",   max: "20");                                // unsigned 32-bit
+  ucount:ulong (min: "100",  max: "200");                               // unsigned 64-bit
+  code:string  (min_length: "2", max_length: "6");                      // string, no pattern
+  ubyte_v:ubyte;                                                        // unsigned, no bounds
+}
+
+root_type RoleEvent;
