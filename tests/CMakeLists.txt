@@ -31,3 +31,16 @@ target_compile_definitions(schema_guided_random_generator_test PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(schema_guided_random_generator_test)
+
+# MTL parser/preprocessor unit tests. Compiles the parser + tree sources directly
+# (no librybench link) since they are self-contained and have no FlatBuffers deps.
+add_executable(test_mtl_parser
+    property_guided/mtl_parser_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/rybench/generator/property_guided/mtl_parser.cpp
+    ${CMAKE_SOURCE_DIR}/src/rybench/generator/property_guided/mtl_tree.cpp
+)
+target_include_directories(test_mtl_parser PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/rybench/generator/property_guided
+)
+target_link_libraries(test_mtl_parser PRIVATE GTest::gtest_main)
+gtest_discover_tests(test_mtl_parser)
