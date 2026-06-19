@@ -1,0 +1,11 @@
+namespace benchmark;
+
+attribute "mtl";
+
+// bounded recurrence globally — future fragment (u=100, l=0)
+table Event (mtl: "always[0,inf] (eventually[0,10] p)") {
+  timestamp:ulong;
+  p:bool;
+}
+
+root_type Event;

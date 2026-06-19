@@ -1,0 +1,17 @@
+[runtime]
+app_name = "mtl_bounded_absence_between_q_and_r_%i"
+
+[schema]
+bfbs = "benchmark/mtl/bounded_absence_between_q_and_r/schema.bfbs"
+
+[generator]
+algorithm = "property_guided"
+seed = 1
+count = 1000
+
+[serializer]
+type = "json"
+
+[filewriter]
+output = "benchmark/mtl/output_traces/bounded_absence_between_q_and_r.out"
+rate_hz = 0

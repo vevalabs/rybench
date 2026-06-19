@@ -1,0 +1,17 @@
+[runtime]
+app_name = "mtl_eventual_p_%i"
+
+[schema]
+bfbs = "benchmark/mtl/eventual_p/schema.bfbs"
+
+[generator]
+algorithm = "property_guided"
+seed = 1
+count = 1000
+
+[serializer]
+type = "json"
+
+[filewriter]
+output = "benchmark/mtl/output_traces/eventual_p.out"
+rate_hz = 0

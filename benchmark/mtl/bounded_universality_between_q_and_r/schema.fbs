@@ -1,0 +1,13 @@
+namespace benchmark;
+
+attribute "mtl";
+
+// bounded universality between q and r — future fragment (u=100, l=0)
+table Event (mtl: "always[0,inf] ((q and ((not r) and eventually[0,10] r)) implies (p until[0,10] (r and p)))") {
+  timestamp:ulong;
+  p:bool;
+  q:bool;
+  r:bool;
+}
+
+root_type Event;

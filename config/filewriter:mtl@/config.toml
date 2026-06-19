@@ -1,0 +1,13 @@
+[runtime]
+app_name = "bench_mtl_%i"
+[schema]
+bfbs = "schemas/mtl-example.bfbs"
+[generator]
+algorithm = "schema_guided"
+seed = 1
+count = 0
+[serializer]
+type = "flatbuffers"
+[filewriter]
+output = "/tmp/rybench-mtl.out"
+rate_hz = 1000000
