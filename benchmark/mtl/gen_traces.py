@@ -51,20 +51,19 @@ def override(cfg, count, out_path):
 
 def parse_stats(text):
     m = re.search(
-        r"retry stats: steps=(\d+), trials=(\d+), first-try=(\d+) \((\d+)%\), "
-        r"retried-steps=(\d+), retries=(\d+), max-trials/step=(\d+)(?:, give-ups=(\d+))?",
+        r"retry stats: events=(\d+), first-try=(\d+) \((\d+)%\), "
+        r"conflict-retry=(\d+) \([\d.]+/event\), deadend-retry=(\d+) \([\d.]+/event\), "
+        r"step/event=([\d.]+), max-trials/event=(\d+)(?:, give-ups=(\d+))?",
         text)
     if not m:
         return None
     g = m.groups()
-    pa = re.search(r"proceed-attempts=(\d+)(?: \((\d+)/step\))?", text)
-    rc = re.search(r"reroll-cause\[tryStep-fail=(\d+), probe-fail=(\d+)\]", text)
-    return {"steps": int(g[0]), "trials": int(g[1]), "first_pct": int(g[3]),
-            "retries": int(g[5]), "max_trials": int(g[6]), "give_ups": int(g[7] or 0),
-            "proceed": int(pa.group(1)) if pa else 0,
-            "proceed_per_step": int(pa.group(2)) if pa and pa.group(2) else 0,
-            "tsfail": int(rc.group(1)) if rc else 0,
-            "pfail": int(rc.group(2)) if rc else 0}
+    events = int(g[0])
+    return {"events": events, "first_pct": int(g[2]),
+            "conflict_retry": int(g[3]), "deadend_retry": int(g[4]),
+            "step_per_event": float(g[5]), "max_trials": int(g[6]), "give_ups": int(g[7] or 0),
+            "conflict_per_event": int(g[3]) / events if events else 0.0,
+            "deadend_per_event":  int(g[4]) / events if events else 0.0}
 
 
 def read_frames(path):
@@ -160,20 +159,19 @@ def main():
         print(f"  generated {name} ({n} events, {dt * 1000:.1f} ms)")
 
     print(f"\n=== Property-Guided trace generation (target length N={count}) ===\n")
-    hdr = (f"{'#':>2}  {'property':<38}{'events':>7}{'first-try':>10}"
-           f"{'retries':>9}{'give-ups':>9}{'time':>11}{'ev/s':>12}{'proc/step':>10}"
-           f"{'tsf':>8}{'pf':>8}  status")
+    hdr = (f"{'#':>2}  {'property':<38}{'events':>7}{'first':>7}"
+           f"{'conflict/ev':>13}{'deadend/ev':>12}{'step/ev':>9}"
+           f"{'give-ups':>9}{'time':>11}{'ev/s':>12}  status")
     print(hdr)
     print("-" * len(hdr))
     tot_events = ok = finite = gave = 0
     tot_time = 0.0
     for i, (name, n, st, dt) in enumerate(rows, 1):
-        ft = f"{st['first_pct']}%" if st else "-"
-        rt = st["retries"]  if st else "-"
-        gu = st["give_ups"] if st else "-"
-        pps = st["proceed_per_step"] if st else "-"
-        tsf = st["tsfail"] if st else "-"
-        pf  = st["pfail"]  if st else "-"
+        ft  = f"{st['first_pct']}%"             if st else "-"
+        cf  = f"{st['conflict_per_event']:.2f}" if st else "-"
+        de  = f"{st['deadend_per_event']:.2f}"  if st else "-"
+        spe = f"{st['step_per_event']:.1f}"     if st else "-"
+        gu  = st["give_ups"] if st else "-"
         s = status(n, count, st)
         rate = f"{n / dt:,.0f}" if dt > 0 else "-"
         tot_events += n
@@ -181,8 +179,8 @@ def main():
         ok     += s == "ok"
         finite += s == "finite"
         gave   += s == "gave-up"
-        print(f"{i:>2}  {name:<38}{n:>7}{ft:>10}{rt:>9}{gu:>9}"
-              f"{dt * 1000:>9.1f}ms{rate:>12}{pps:>10}{tsf:>8}{pf:>8}  {s}")
+        print(f"{i:>2}  {name:<38}{n:>7}{ft:>7}{cf:>13}{de:>12}{spe:>9}"
+              f"{gu:>9}{dt * 1000:>9.1f}ms{rate:>12}  {s}")
     print("-" * len(hdr))
     overall = f"{tot_events / tot_time:,.0f}" if tot_time > 0 else "-"
     print(f"total: {len(rows)} cases, {tot_events} events in {tot_time:.3f}s "

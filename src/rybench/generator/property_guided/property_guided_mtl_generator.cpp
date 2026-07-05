@@ -70,20 +70,26 @@ PropertyGuidedMTLGenerator::PropertyGuidedMTLGenerator(serializer::Serializer& b
 
 PropertyGuidedMTLGenerator::~PropertyGuidedMTLGenerator() {
     if (statSteps_ == 0 && statGiveUps_ == 0) return;
-    const uint64_t retries = statTrials_ - statSteps_ - statGiveUps_;
+    // A "step" is one candidate step tried (one proceed); an "event" is a committed
+    // output event. Two retry causes make us try extra steps per event, both a
+    // completeness cost:
+    //   conflict-retry — a single step re-proceeded after an a/¬a literal conflict.
+    //   deadend-retry  — the whole lookahead walk abandoned (dead-end) and restarted.
+    // step/event is the total candidate steps tried to commit one event.
+    const uint64_t conflictRetries = statProceedAttempts_ - statTryStepCalls_;
+    const uint64_t deadendRetries  = statTrials_ - statSteps_ - statGiveUps_;
     const int firstPct = statSteps_
         ? static_cast<int>(100.0 * statFirstTry_ / statSteps_ + 0.5) : 0;
-    std::cout << "[property_guided] retry stats: steps=" << statSteps_
-              << ", trials=" << statTrials_ << ", first-try=" << statFirstTry_
-              << " (" << firstPct << "%), retried-steps=" << statRetriedSteps_
-              << ", retries=" << retries << ", max-trials/step=" << statMaxTrials_;
+    const double conflictPerEvent = statSteps_ ? static_cast<double>(conflictRetries) / statSteps_ : 0.0;
+    const double deadendPerEvent  = statSteps_ ? static_cast<double>(deadendRetries)  / statSteps_ : 0.0;
+    const double stepPerEvent     = statSteps_ ? static_cast<double>(statProceedAttempts_) / statSteps_ : 0.0;
+    std::cout << "[property_guided] retry stats: events=" << statSteps_
+              << ", first-try=" << statFirstTry_ << " (" << firstPct << "%)"
+              << ", conflict-retry=" << conflictRetries << " (" << conflictPerEvent << "/event)"
+              << ", deadend-retry=" << deadendRetries << " (" << deadendPerEvent << "/event)"
+              << ", step/event=" << stepPerEvent
+              << ", max-trials/event=" << statMaxTrials_;
     if (statGiveUps_) std::cout << ", give-ups=" << statGiveUps_;
-    std::cout << ", tryStep-calls=" << statTryStepCalls_
-              << ", proceed-attempts=" << statProceedAttempts_;
-    if (statSteps_)
-        std::cout << " (" << (statProceedAttempts_ / statSteps_) << "/step)";
-    std::cout << ", reroll-cause[tryStep-fail=" << statTryStepFails_
-              << ", probe-fail=" << statProbeFails_ << "]";
     std::cout << ", lookahead=" << lookahead_
               << ", probe-attempts=" << probeAttempts_;
     std::cout << "\n";

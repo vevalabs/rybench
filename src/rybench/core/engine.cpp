@@ -54,18 +54,45 @@ int Engine::run(transport::Publisher& publisher) {
     if (maxCount) std::cout << ", count: " << maxCount;
     std::cout << ". Press Ctrl+C to stop.\n";
 
-    // Benchmark mode: time only generate() (no serialize/publish/startup) and
-    // report it at the end, so generation throughput can be measured in isolation.
     const bool bench = std::getenv("RYBENCH_BENCH") != nullptr;
-    std::chrono::nanoseconds genElapsed{0};
-
     uint64_t messageCount = 0;
+
+    // Benchmark mode: isolate generation with a tight generate-only loop timed by a
+    // SINGLE clock pair around the whole loop — so the per-event steady_clock::now()
+    // cost (~15-20 ns) is not folded into the measured time. No serialize/publish.
+    // `sink` reads a byte of every message (and is printed) so -O3 cannot elide the
+    // generate loop as dead code.
+    if (bench) {
+        volatile uint64_t sink = 0;
+        const auto t0 = std::chrono::steady_clock::now();
+        while (running_ && (maxCount == 0 || messageCount < maxCount)) {
+            Message msg;
+            try {
+                msg = gen->generate();
+            } catch (const std::exception& e) {
+                std::cout << e.what() << "\nGenerator stopped after " << messageCount
+                          << " messages.\n";
+                break;
+            }
+            if (msg.empty()) continue;
+            sink += msg.data()[0];                 // observable -> defeats dead-code elimination
+            ++messageCount;
+        }
+        const auto genElapsed = std::chrono::steady_clock::now() - t0;
+        const double ms   = std::chrono::duration_cast<std::chrono::nanoseconds>(genElapsed).count() / 1e6;
+        const double evps = (ms > 0.0) ? messageCount / (ms / 1000.0) : 0.0;
+        std::cout << "[bench] gen-only: " << messageCount << " events, "
+                  << ms << " ms, " << static_cast<uint64_t>(evps) << " ev/s"
+                  << " (sink " << sink << ")\n";
+        std::cout << "Shutting down. Total messages: " << messageCount << "\n";
+        publisher.shutdown();
+        return 0;
+    }
+
     while (running_ && (maxCount == 0 || messageCount < maxCount)) {
         Message msg;
         try {
-            const auto t0 = std::chrono::steady_clock::now();
             msg = gen->generate();
-            if (bench) genElapsed += std::chrono::steady_clock::now() - t0;
         } catch (const std::exception& e) {
             // A generator that cannot continue (e.g. property_guided hitting an
             // unsatisfiable step) ends the run cleanly with the trace so far.
@@ -84,13 +111,6 @@ int Engine::run(transport::Publisher& publisher) {
         }
         if (interval.count() > 0)
             std::this_thread::sleep_for(interval);
-    }
-
-    if (bench) {
-        const double ms   = genElapsed.count() / 1e6;
-        const double evps = (ms > 0.0) ? messageCount / (ms / 1000.0) : 0.0;
-        std::cout << "[bench] gen-only: " << messageCount << " events, "
-                  << ms << " ms, " << static_cast<uint64_t>(evps) << " ev/s\n";
     }
 
     std::cout << "Shutting down. Total messages: " << messageCount << "\n";
