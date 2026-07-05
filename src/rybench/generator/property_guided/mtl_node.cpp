@@ -1,4 +1,5 @@
 #include "mtl_node.hpp"
+#include <array>
 #include <stdexcept>
 
 namespace rybench::generator {
@@ -9,9 +10,18 @@ namespace {
 std::mt19937_64*                      g_rng = nullptr;
 std::vector<Obligation>               g_curr;      // O_curr: obligations processed this step
 std::vector<Obligation>               g_next;      // O_next: obligations carried to the next
-std::unordered_map<std::string, bool> g_literals;  // L: variable -> chosen value
+std::vector<int8_t>                   g_literals;  // L: atom id -> -1 unset / 0 / 1
+std::size_t                           g_numAtoms = 0;
 std::vector<MTLNode*>                 g_fired;     // nodes already processed this step
 bool                                  g_conflict = false;
+
+// Coverage instrumentation (opt-in, gated so the hot path is untouched when off).
+bool                                  g_coverage = false;
+std::size_t                           g_nodeCount = 0;
+std::vector<uint32_t>                 g_reached;   // per-node reached count (this attempt)
+std::vector<uint32_t>                 g_firedCnt;  // per-node fired  count (this attempt)
+std::vector<uint32_t>                 g_chLeft;    // per-Or left-branch taken (this attempt)
+std::vector<uint32_t>                 g_chRight;   // per-Or right-branch taken (this attempt)
 
 // Advance a window bound by one step (inf stays inf, floored at 0).
 uint64_t dec(uint64_t x) { return (x == kInf) ? kInf : (x > 0 ? x - 1 : 0); }
@@ -19,7 +29,20 @@ uint64_t dec(uint64_t x) { return (x == kInf) ? kInf : (x > 0 ? x - 1 : 0); }
 // Fire probability for an existential obligation with `hi` steps left to its
 // deadline: 1/(hi+1) — uniform over the remaining window, certain (1) at the
 // deadline. An unbounded window (hi = inf) has no deadline → 1/2.
-double fireProb(uint64_t hi) { return (hi == kInf) ? 0.5 : 1.0 / static_cast<double>(hi + 1); }
+//
+// hi is bounded by the formula's window (small: <= W), so the 1/(hi+1) divide is
+// precomputed once into a table and read back with an indexed load on the hot
+// path. Same double value as the divide -> bit-identical traces.
+const std::array<double, 256> g_fireProb = [] {
+    std::array<double, 256> t{};
+    for (std::size_t i = 0; i < t.size(); ++i) t[i] = 1.0 / static_cast<double>(i + 1);
+    return t;
+}();
+
+double fireProb(uint64_t hi) {
+    if (hi == kInf) return 0.5;
+    return hi < g_fireProb.size() ? g_fireProb[hi] : 1.0 / static_cast<double>(hi + 1);
+}
 
 double unif() { return std::uniform_real_distribution<double>(0.0, 1.0)(*g_rng); }
 
@@ -30,10 +53,10 @@ Obligation windowOf(MTLNode* n) {
     return {n, n->timeLow, n->timeHigh};
 }
 
-void addLiteral(const std::string& var, bool value) {
-    auto it = g_literals.find(var);
-    if (it == g_literals.end()) g_literals.emplace(var, value);  // first write wins
-    else if (it->second != value) g_conflict = true;             // a and ¬a
+void addLiteral(int id, bool value) {
+    const int8_t v = value ? 1 : 0;
+    if (g_literals[id] < 0) g_literals[id] = v;          // first write wins
+    else if (g_literals[id] != v) g_conflict = true;     // a and ¬a
 }
 
 bool firstFire(MTLNode* n) {
@@ -45,18 +68,40 @@ bool firstFire(MTLNode* n) {
 }  // namespace
 
 void setProceedRng(std::mt19937_64* rng) { g_rng = rng; }
+void setLiteralCount(std::size_t numAtoms) {
+    g_numAtoms = numAtoms;
+    g_literals.assign(numAtoms, static_cast<int8_t>(-1));
+}
+void setCoverage(bool on) { g_coverage = on; }
+void setNodeCount(std::size_t numNodes) {
+    g_nodeCount = numNodes;
+    g_reached.assign(numNodes, 0u);
+    g_firedCnt.assign(numNodes, 0u);
+    g_chLeft.assign(numNodes, 0u);
+    g_chRight.assign(numNodes, 0u);
+}
 
 void resetAttempt() {                 // clears the per-attempt state, not O_curr
-    g_literals.clear();
+    g_literals.assign(g_numAtoms, static_cast<int8_t>(-1));
     g_fired.clear();
     g_next.clear();
     g_conflict = false;
+    if (g_coverage) {
+        g_reached.assign(g_nodeCount, 0u);
+        g_firedCnt.assign(g_nodeCount, 0u);
+        g_chLeft.assign(g_nodeCount, 0u);
+        g_chRight.assign(g_nodeCount, 0u);
+    }
 }
 
 bool stepConflict() { return g_conflict; }
-std::vector<Obligation>&               stepCurr()     { return g_curr; }
-std::vector<Obligation>&               stepNext()     { return g_next; }
-std::unordered_map<std::string, bool>& stepLiterals() { return g_literals; }
+std::vector<Obligation>& stepCurr()     { return g_curr; }
+std::vector<Obligation>& stepNext()     { return g_next; }
+std::vector<int8_t>&     stepLiterals() { return g_literals; }
+std::vector<uint32_t>&   stepReached()  { return g_reached; }
+std::vector<uint32_t>&   stepFired()    { return g_firedCnt; }
+std::vector<uint32_t>&   stepChoiceLeft()  { return g_chLeft; }
+std::vector<uint32_t>&   stepChoiceRight() { return g_chRight; }
 
 // Proceed: boolean nodes only steer this step's traversal; temporal nodes call
 // their child(ren) and/or carry an obligation into the next step. `lo,hi` is this
@@ -64,9 +109,12 @@ std::unordered_map<std::string, bool>& stepLiterals() { return g_literals; }
 // window; existential nodes (Eventually/Until) ignore it and use the carried
 // (tightest) window from windowOf, processing once.
 void MTLNode::proceed(uint64_t lo, uint64_t hi) {
+    // Count reach once per step (active-step count), not per proceed-call: a node
+    // can be proceed'd twice in a step (carried obligation + fresh trigger).
+    if (g_coverage && !g_reached[nodeId]) g_reached[nodeId] = 1;
     switch (op) {
     case Op::Atom:
-        addLiteral(variable, !negated);                  // literal a → true, ¬a → false
+        addLiteral(varId, !negated);                     // literal a → true, ¬a → false
         break;
 
     case Op::And:
@@ -82,6 +130,7 @@ void MTLNode::proceed(uint64_t lo, uint64_t hi) {
             l = unif() < 0.5; r = unif() < 0.5;
             if (!l && !r) { if (unif() < 0.5) l = true; else r = true; }
         }
+        if (g_coverage) { if (l) ++g_chLeft[nodeId]; if (r) ++g_chRight[nodeId]; }
         if (l) left->proceed(left->timeLow, left->timeHigh);
         if (r) right->proceed(right->timeLow, right->timeHigh);
         break;
@@ -90,8 +139,12 @@ void MTLNode::proceed(uint64_t lo, uint64_t hi) {
     case Op::Eventually: {                               // F (existential): once, tightest deadline
         if (!firstFire(this)) break;
         Obligation o = windowOf(this);
-        if (o.lo == 0 && unif() < fireProb(o.hi)) child->proceed(child->timeLow, child->timeHigh);
-        else g_next.push_back({this, dec(o.lo), dec(o.hi)});
+        if (o.lo == 0 && unif() < fireProb(o.hi)) {
+            if (g_coverage) ++g_firedCnt[nodeId];
+            child->proceed(child->timeLow, child->timeHigh);
+        } else {
+            g_next.push_back({this, dec(o.lo), dec(o.hi)});
+        }
         break;
     }
 
@@ -101,7 +154,10 @@ void MTLNode::proceed(uint64_t lo, uint64_t hi) {
         // ¬p/p window EXTENDS when q recurs. No coin here, so asserting once
         // (firstFire) is the only thing that must be deduplicated.
         if (hi > 0) g_next.push_back({this, dec(lo), dec(hi)});
-        if (firstFire(this) && lo == 0) child->proceed(child->timeLow, child->timeHigh);
+        if (firstFire(this) && lo == 0) {
+            if (g_coverage) ++g_firedCnt[nodeId];
+            child->proceed(child->timeLow, child->timeHigh);
+        }
         break;
     }
 
@@ -109,6 +165,7 @@ void MTLNode::proceed(uint64_t lo, uint64_t hi) {
         if (!firstFire(this)) break;
         Obligation o = windowOf(this);
         if (o.lo == 0 && unif() < fireProb(o.hi)) {
+            if (g_coverage) ++g_firedCnt[nodeId];
             right->proceed(right->timeLow, right->timeHigh);   // psi → discharge
         } else {
             left->proceed(left->timeLow, left->timeHigh);      // phi holds
@@ -121,8 +178,12 @@ void MTLNode::proceed(uint64_t lo, uint64_t hi) {
         if (!firstFire(this)) break;
         Obligation o = windowOf(this);
         right->proceed(right->timeLow, right->timeHigh);       // psi holds this step
-        if (unif() < 0.5) left->proceed(left->timeLow, left->timeHigh);  // phi releases -> discharge
-        else if (o.hi > 0) g_next.push_back({this, dec(o.lo), dec(o.hi)});
+        if (unif() < 0.5) {
+            if (g_coverage) ++g_firedCnt[nodeId];
+            left->proceed(left->timeLow, left->timeHigh);      // phi releases -> discharge
+        } else if (o.hi > 0) {
+            g_next.push_back({this, dec(o.lo), dec(o.hi)});
+        }
         break;
     }
 

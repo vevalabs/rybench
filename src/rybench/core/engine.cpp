@@ -3,6 +3,7 @@
 #include <rybench/serializer/serializer_factory.hpp>
 
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <thread>
 
@@ -53,11 +54,18 @@ int Engine::run(transport::Publisher& publisher) {
     if (maxCount) std::cout << ", count: " << maxCount;
     std::cout << ". Press Ctrl+C to stop.\n";
 
+    // Benchmark mode: time only generate() (no serialize/publish/startup) and
+    // report it at the end, so generation throughput can be measured in isolation.
+    const bool bench = std::getenv("RYBENCH_BENCH") != nullptr;
+    std::chrono::nanoseconds genElapsed{0};
+
     uint64_t messageCount = 0;
     while (running_ && (maxCount == 0 || messageCount < maxCount)) {
         Message msg;
         try {
+            const auto t0 = std::chrono::steady_clock::now();
             msg = gen->generate();
+            if (bench) genElapsed += std::chrono::steady_clock::now() - t0;
         } catch (const std::exception& e) {
             // A generator that cannot continue (e.g. property_guided hitting an
             // unsatisfiable step) ends the run cleanly with the trace so far.
@@ -76,6 +84,13 @@ int Engine::run(transport::Publisher& publisher) {
         }
         if (interval.count() > 0)
             std::this_thread::sleep_for(interval);
+    }
+
+    if (bench) {
+        const double ms   = genElapsed.count() / 1e6;
+        const double evps = (ms > 0.0) ? messageCount / (ms / 1000.0) : 0.0;
+        std::cout << "[bench] gen-only: " << messageCount << " events, "
+                  << ms << " ms, " << static_cast<uint64_t>(evps) << " ev/s\n";
     }
 
     std::cout << "Shutting down. Total messages: " << messageCount << "\n";

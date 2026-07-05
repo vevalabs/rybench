@@ -8,6 +8,7 @@ N = trace length (number of events / message count) for every case. For each of
 the 12 cases a trace of up to N events is generated and written, as tuples, to
 benchmark/mtl/output_traces/<name>.tuples. A statistics table is printed at the end.
 """
+import argparse
 import json
 import os
 import re
@@ -98,7 +99,7 @@ def write_tuples(events, path):
     return len(events)
 
 
-def run_case(name, count):
+def run_case(name, count, seed=None):
     cfg = open(os.path.join(MTL_DIR, name, "config.toml")).read()
     with tempfile.TemporaryDirectory() as tmp:
         node_dir = os.path.join(tmp, name)
@@ -107,6 +108,8 @@ def run_case(name, count):
         open(os.path.join(node_dir, "config.toml"), "w").write(
             override(cfg, count, out_file))
         env = dict(os.environ, RYBENCH_CONFIG=tmp)
+        if seed is not None:
+            env["RYBENCH_SEED"] = str(seed)
         t0 = time.perf_counter()
         proc = subprocess.run([BINARY, name], cwd=REPO, env=env,
                               capture_output=True, text=True)
@@ -126,9 +129,14 @@ def status(n, count, st):
 
 
 def main():
-    if len(sys.argv) != 2 or not sys.argv[1].isdigit():
-        sys.exit("usage: gen_traces.py <N>   (N = trace length / events per case)")
-    count = int(sys.argv[1])
+    ap = argparse.ArgumentParser(
+        description="Generate one property-guided trace per MTL benchmark case.")
+    ap.add_argument("N", type=int, help="trace length (events per case)")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="RYBENCH_SEED override: 0 = fresh random trace each run, "
+                         "N = reproducible (defaults to each config's own seed)")
+    args = ap.parse_args()
+    count = args.N
     if not os.path.exists(BINARY):
         sys.exit(f"missing {BINARY} — build rybench-filewriter first")
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -147,7 +155,7 @@ def main():
 
     rows = []
     for name in properties():
-        n, st, dt = run_case(name, count)
+        n, st, dt = run_case(name, count, args.seed)
         rows.append((name, n, st, dt))
         print(f"  generated {name} ({n} events, {dt * 1000:.1f} ms)")
 

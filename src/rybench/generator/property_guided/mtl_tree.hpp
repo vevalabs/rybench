@@ -35,4 +35,8 @@ std::string toAsciiTree(const MTLNode& node);
 // Collect all atom variable names referenced anywhere in the formula tree.
 void collectAtoms(const MTLNode& node, std::unordered_set<std::string>& out);
 
+// Assign a stable depth-first id (root = 0) to every node of the (converted) tree,
+// so coverage stats and the ASCII figure refer to the same node numbers.
+void assignNodeIds(MTLNode& node);
+
 } // namespace rybench::generator

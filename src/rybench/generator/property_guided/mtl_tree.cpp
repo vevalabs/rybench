@@ -198,7 +198,7 @@ std::string nodeLabel(const MTLNode& n) {
         case MTLNode::Op::Atom:       return n.negated ? "¬" + n.variable : n.variable;
         case MTLNode::Op::Not:        return "not";
         case MTLNode::Op::And:        return "and";
-        case MTLNode::Op::Or:         return "or";
+        case MTLNode::Op::Or:         return n.exclusive ? "xor" : "or";
         case MTLNode::Op::Implies:    return "implies";
         case MTLNode::Op::Eventually: return "eventually" + boundsStr(n);
         case MTLNode::Op::Always:     return "always" + boundsStr(n);
@@ -208,11 +208,18 @@ std::string nodeLabel(const MTLNode& n) {
     return "?";
 }
 
+void assignNodeIdsRec(MTLNode& n, int& next) {
+    n.nodeId = next++;
+    if (n.left)  assignNodeIdsRec(*n.left, next);
+    if (n.right) assignNodeIdsRec(*n.right, next);
+    if (n.child) assignNodeIdsRec(*n.child, next);
+}
+
 void render(const MTLNode& n, const std::string& prefix, bool isLast,
             bool isRoot, std::string& out) {
     out += prefix;
     if (!isRoot) out += (isLast ? "└── " : "├── ");
-    out += nodeLabel(n);
+    out += "[" + std::to_string(n.nodeId) + "] " + nodeLabel(n);
     out += '\n';
 
     const MTLNode* kids[3];
@@ -234,6 +241,8 @@ std::string toAsciiTree(const MTLNode& node) {
     render(node, "", true, true, out);
     return out;
 }
+
+void assignNodeIds(MTLNode& node) { int next = 0; assignNodeIdsRec(node, next); }
 
 void collectAtoms(const MTLNode& node, std::unordered_set<std::string>& out) {
     if (node.op == MTLNode::Op::Atom) {

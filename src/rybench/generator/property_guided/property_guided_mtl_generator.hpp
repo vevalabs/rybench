@@ -30,6 +30,8 @@ public:
 private:
     serializer::Serializer& backend_;
     const std::vector<core::SchemaField>* fields_ = nullptr;
+    std::vector<int>                fieldAtomId_;  // fields_[i] -> atom id, or -1 if not a bool atom
+    std::size_t                     numAtoms_ = 0; // number of bool atoms (size of the literal set L)
 
     MTLNode formula_;                  // preprocessed (NNF) formula tree
     double  timeStep_    = 1.0;
@@ -42,20 +44,36 @@ private:
     int                             lookahead_     = 11; // probe depth (env-overridable)
     int                             probeAttempts_ = 8;  // probe per-step budget (env-overridable)
 
-    // One generated step: the chosen literals and the obligations carried forward.
-    struct StepResult {
-        std::unordered_map<std::string, bool> literals;
-        std::vector<Obligation>               next;
-    };
+    // Coverage instrumentation (opt-in via RYBENCH_COVERAGE): per-node reached/fired
+    // counts accumulated over committed steps, dumped at destruction.
+    bool                     coverage_  = false;
+    std::size_t              nodeCount_ = 0;
+    std::vector<uint64_t>    totReached_, totFired_;  // per-node totals over the trace
+    std::vector<uint64_t>    totChoiceLeft_, totChoiceRight_;  // per-Or branch choices
+    std::vector<std::string> nodeLabels_;             // node id -> "op[bounds]" for the report
+    // Per-atom determination: how each variable's value was fixed each committed step.
+    std::vector<uint64_t>    totForcedTrue_, totForcedFalse_, totFree_;
+    std::vector<uint64_t>    totFreeTrue_, totFreeFalse_;  // random outcome of free vars (~50/50)
+
     // Generate one consistent step from `curr` with up to `attempts` intra-step
-    // retries on an a/¬a contradiction; null if none was conflict-free.
-    std::optional<StepResult> tryStep(const std::vector<Obligation>& curr, int attempts);
-    // Walk `depth` steps from `start`, returning the first (the step to emit) iff the
-    // whole walk stays conflict-free; nullopt if it dead-ends. Picks AND validates.
-    std::optional<StepResult> probe(const std::vector<Obligation>& start, int depth);
+    // retries on an a/¬a contradiction. On success the chosen literals and carried
+    // obligations are left in the step globals (stepLiterals()/stepNext(), plus the
+    // coverage globals); false if none was conflict-free.
+    bool tryStep(const std::vector<Obligation>& curr, int attempts);
+    // Walk `depth` steps from `start`; true iff the whole walk stays conflict-free
+    // (picks AND validates). The first (emitted) step is saved in the first*_ buffers.
+    bool probe(const std::vector<Obligation>& start, int depth);
 
     void          merge(std::vector<Obligation>& obs);  // collapse same-node obligations
     core::Message encode();                             // build a message from the literals
+
+    std::vector<Obligation> mergeScratch_;    // reused across merge() calls (no per-call heap churn)
+    std::vector<Obligation> rerollSnapshot_;  // reused reroll snapshot of O_curr (no per-event copy alloc)
+    std::vector<Obligation> workCurr_;        // probe's reused walk cursor (no per-step copy alloc)
+    // Saved first (emitted) step of a probe walk — reused buffers, no per-event alloc.
+    std::vector<int8_t>     firstLiterals_;
+    std::vector<Obligation> firstNext_;
+    std::vector<uint32_t>   firstReached_, firstFired_, firstChLeft_, firstChRight_;  // coverage (empty if off)
 
     // Step-retry statistics, summarized at destruction.
     uint64_t statSteps_ = 0, statTrials_ = 0, statFirstTry_ = 0,

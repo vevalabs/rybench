@@ -26,13 +26,19 @@ except ImportError:
              f"{os.path.join(BENCH, 'tools', 'timescales')}")
 
 # property name -> bounds it needs (lbound matters only for *_between_* and response)
+# Ordered to match RyBench's sorted MTL cases 1:1 (timescales 'always_*' == our
+# 'universality_*'), so the two throughput tables line up row for row.
 PROPERTIES = [
-    "absence_after_q",
-    "absence_before_r",
-    "absence_between_q_and_r",
-    "always_after_q",
-    "recurrence_globally",
-    "response_globally",
+    "absence_after_q",             # bounded_absence_after_q
+    "absence_before_r",            # bounded_absence_before_r
+    "absence_between_q_and_r",     # bounded_absence_between_q_and_r
+    "recurrence_between_q_and_r",  # bounded_recurrence_between_q_and_r
+    "recurrence_globally",         # bounded_recurrence_globally
+    "response_between_q_and_r",    # bounded_response_between_q_and_r
+    "response_globally",           # bounded_response_globally
+    "always_after_q",              # bounded_universality_after_q
+    "always_before_r",             # bounded_universality_before_r
+    "always_between_q_and_r",      # bounded_universality_between_q_and_r
 ]
 
 

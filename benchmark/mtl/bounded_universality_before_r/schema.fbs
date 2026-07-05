@@ -3,7 +3,7 @@ namespace benchmark;
 attribute "mtl";
 
 // bounded universality before r — future fragment (u=100, l=0)
-table Event (mtl: "always[0,inf] (eventually[0,10] r implies (p until[0,10] (r and p)))") {
+table Event (mtl: "always[0,inf] (eventually[0,10] r implies (p until[0,10] r))") {
   timestamp:ulong;
   p:bool;
   r:bool;
