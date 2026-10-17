@@ -154,7 +154,11 @@ void MTLNode::proceed(uint64_t lo, uint64_t hi) {
         // ¬p/p window EXTENDS when q recurs. No coin here, so asserting once
         // (firstFire) is the only thing that must be deduplicated.
         if (hi > 0) g_next.push_back({this, dec(lo), dec(hi)});
-        if (firstFire(this) && lo == 0) {
+        // Consume the per-step fire token ONLY on a maturing reach (lo==0). A fresh
+        // re-trigger with lo>0 (e.g. the inner G[1,1] of a nested always) must not
+        // burn the token, or the matured carried obligation that actually asserts the
+        // child gets suppressed and the constraint silently vanishes.
+        if (lo == 0 && firstFire(this)) {
             if (g_coverage) ++g_firedCnt[nodeId];
             child->proceed(child->timeLow, child->timeHigh);
         }
