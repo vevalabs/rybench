@@ -26,6 +26,7 @@ private:
     std::size_t maxPayloadSize_ = 4096;
     int rateHz_ = 10;
     bool initialized_{false};
+    bool stampTime_ = false;   // prepend an 8-byte steady_clock ns for latency mode
 
     struct Impl;
     std::unique_ptr<Impl> impl_;
