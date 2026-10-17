@@ -118,7 +118,12 @@ core::Message FlatbuffersSerializer::finalizeMessage() {
     writeTable(ctx, true);
     auto* buf = builder_.GetBufferPointer();
     auto  sz  = builder_.GetSize();
-    return core::Message(std::vector<uint8_t>(buf, buf + sz),
+    // Zero-copy: view into the builder's own buffer instead of copying it into a
+    // fresh heap vector every message. Valid until the next initMessage(), which
+    // Clears the builder. The engine loop consumes each message (serialize +
+    // publish) before generating the next one, so the view never outlives its
+    // backing store.
+    return core::Message(std::span<const uint8_t>(buf, sz),
                          core::MessageFormat::FlatBuffers);
 }
 
