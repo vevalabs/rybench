@@ -1,0 +1,229 @@
+namespace osi;
+
+// OSI (ASAM Open Simulation Interface) HostVehicleData, ported COMPLETELY from
+// osi_hostvehicledata.proto / osi_common.proto / osi_route.proto (master).
+// EVERY field of HostVehicleData and every nested sub-message is defined — no
+// omitted subtrees. Cross-object links (logical_lane_id, ...) are OSI Identifier
+// references, as in OSI itself. Enum value names are given unique prefixes so the
+// dynamic protobuf descriptor (which flattens enum values) has no name clashes.
+// Used as the "large" perf schema.
+
+attribute "min";
+attribute "max";
+attribute "min_items";
+attribute "max_items";
+attribute "min_length";
+attribute "max_length";
+
+// ---- osi_common leaf types ----
+table Vector3d {
+  x: double (min: "-1000.0", max: "1000.0");
+  y: double (min: "-1000.0", max: "1000.0");
+  z: double (min: "-100.0",  max: "100.0");
+}
+table Vector2d {
+  x: double (min: "-1000.0", max: "1000.0");
+  y: double (min: "-1000.0", max: "1000.0");
+}
+table Orientation3d {
+  roll:  double (min: "-3.14159", max: "3.14159");
+  pitch: double (min: "-3.14159", max: "3.14159");
+  yaw:   double (min: "-3.14159", max: "3.14159");
+}
+table Dimension3d {
+  length: double (min: "0.1", max: "20.0");
+  width:  double (min: "0.1", max: "5.0");
+  height: double (min: "0.1", max: "5.0");
+}
+table Timestamp {
+  seconds: long (min: "0", max: "1000000");
+  nanos:   uint (min: "0", max: "999999999");
+}
+table Identifier {
+  value: ulong (min: "1", max: "100000");
+}
+table InterfaceVersion {
+  version_major: uint (min: "3", max: "3");
+  version_minor: uint (min: "0", max: "7");
+  version_patch: uint (min: "0", max: "5");
+}
+table GeodeticPosition {
+  longitude: double (min: "-180.0", max: "180.0");
+  latitude:  double (min: "-90.0",  max: "90.0");
+  altitude:  double (min: "-500.0", max: "9000.0");
+}
+table VehicleSteeringWheel {
+  angle:         double (min: "-8.0", max: "8.0");
+  angular_speed: double (min: "-20.0", max: "20.0");
+  torque:        double (min: "-100.0", max: "100.0");
+}
+table KeyValuePair {
+  key:   string (min_length: "2", max_length: "12");
+  value: string (min_length: "1", max_length: "16");
+}
+table BaseMoving {
+  dimension:                Dimension3d;
+  position:                 Vector3d;
+  orientation:              Orientation3d;
+  velocity:                 Vector3d;
+  acceleration:             Vector3d;
+  orientation_rate:         Orientation3d;
+  base_polygon:             [Vector2d] (min_items: "3", max_items: "8");
+  orientation_acceleration: Orientation3d;
+}
+
+// ---- osi_route leaf types (references are Identifiers, not embedded) ----
+table LogicalLaneSegment {
+  logical_lane_id: Identifier;
+  start_s:         double (min: "0.0", max: "1000.0");
+  end_s:           double (min: "0.0", max: "1000.0");
+}
+table RouteSegment {
+  lane_segment: [LogicalLaneSegment] (min_items: "1", max_items: "4");
+}
+table Route {
+  route_id:      Identifier;
+  route_segment: [RouteSegment] (min_items: "1", max_items: "6");
+}
+
+// ---- HostVehicleData sub-messages ----
+enum OperatingState : ubyte {
+  OPSTATE_UNKNOWN       = 0,
+  OPSTATE_OTHER         = 1,
+  OPSTATE_SLEEP         = 2,
+  OPSTATE_STANDBY       = 3,
+  OPSTATE_BOARDING      = 4,
+  OPSTATE_ENTERTAINMENT = 5,
+  OPSTATE_DRIVING       = 6,
+  OPSTATE_DIAGNOSTIC    = 7
+}
+table VehicleBasics {
+  curb_weight:     double (min: "500.0", max: "40000.0");
+  operating_state: OperatingState;
+}
+
+enum MotorType : ubyte {
+  MOTOR_UNKNOWN  = 0,
+  MOTOR_OTHER    = 1,
+  MOTOR_OTTO     = 2,
+  MOTOR_DIESEL   = 3,
+  MOTOR_ELECTRIC = 4
+}
+table Motor {
+  type:   MotorType;
+  rpm:    double (min: "0.0",    max: "16000.0");
+  torque: double (min: "-500.0", max: "1500.0");
+}
+table VehiclePowertrain {
+  pedal_position_acceleration: double (min: "0.0", max: "1.0");
+  pedal_position_clutch:       double (min: "0.0", max: "1.0");
+  gear_transmission:           int    (min: "-1",  max: "8");
+  motor:                       [Motor] (min_items: "1", max_items: "4");
+}
+
+table VehicleBrakeSystem {
+  pedal_position_brake: double (min: "0.0", max: "1.0");
+}
+
+table VehicleSteering {
+  vehicle_steering_wheel: VehicleSteeringWheel;
+}
+
+table WheelData {
+  axle:          uint   (min: "0", max: "3");
+  index:         uint   (min: "0", max: "1");
+  rotation_rate: double (min: "0.0", max: "200.0");
+  slip:          double (min: "-1.0", max: "1.0");
+}
+table VehicleWheels {
+  wheel_data: [WheelData] (min_items: "2", max_items: "8");
+}
+
+table VehicleLocalization {
+  position:          Vector3d;
+  orientation:       Orientation3d;
+  geodetic_position: GeodeticPosition;
+}
+
+table VehicleMotion {
+  position:          Vector3d;
+  orientation:       Orientation3d;
+  velocity:          Vector3d;
+  orientation_rate:  Orientation3d;
+  acceleration:      Vector3d;
+  current_curvature: double (min: "-0.5", max: "0.5");
+}
+
+enum AdfName : ubyte {
+  ADF_UNKNOWN                        = 0,
+  ADF_OTHER                          = 1,
+  ADF_BLIND_SPOT_WARNING             = 2,
+  ADF_FORWARD_COLLISION_WARNING      = 3,
+  ADF_LANE_DEPARTURE_WARNING         = 4,
+  ADF_PARKING_COLLISION_WARNING      = 5,
+  ADF_REAR_CROSS_TRAFFIC_WARNING     = 6,
+  ADF_AUTOMATIC_EMERGENCY_BRAKING    = 7,
+  ADF_AUTOMATIC_EMERGENCY_STEERING   = 8,
+  ADF_REVERSE_AEB                    = 9,
+  ADF_ADAPTIVE_CRUISE_CONTROL        = 10,
+  ADF_LANE_KEEPING_ASSIST            = 11,
+  ADF_ACTIVE_DRIVING_ASSISTANCE      = 12,
+  ADF_BACKUP_CAMERA                  = 13,
+  ADF_SURROUND_VIEW_CAMERA           = 14,
+  ADF_ACTIVE_PARKING_ASSISTANCE      = 15,
+  ADF_REMOTE_PARKING_ASSISTANCE      = 16,
+  ADF_TRAILER_ASSISTANCE             = 17,
+  ADF_AUTOMATIC_HIGH_BEAMS           = 18,
+  ADF_DRIVER_MONITORING              = 19,
+  ADF_HEAD_UP_DISPLAY                = 20,
+  ADF_NIGHT_VISION                   = 21,
+  ADF_URBAN_DRIVING                  = 22,
+  ADF_HIGHWAY_AUTOPILOT              = 23,
+  ADF_CRUISE_CONTROL                 = 24,
+  ADF_SPEED_LIMIT_CONTROL            = 25
+}
+enum AdfState : ubyte {
+  ADFSTATE_UNKNOWN     = 0,
+  ADFSTATE_OTHER       = 1,
+  ADFSTATE_ERRORED     = 2,
+  ADFSTATE_UNAVAILABLE = 3,
+  ADFSTATE_AVAILABLE   = 4,
+  ADFSTATE_STANDBY     = 5,
+  ADFSTATE_ACTIVE      = 6
+}
+enum OverrideReason : ubyte {
+  OVERRIDE_BRAKE_PEDAL    = 0,
+  OVERRIDE_STEERING_INPUT = 1
+}
+table DriverOverride {
+  active:          bool;
+  override_reason: [OverrideReason] (min_items: "0", max_items: "2");
+}
+table VehicleAutomatedDrivingFunction {
+  name:          AdfName;
+  custom_name:   string (min_length: "0", max_length: "12");
+  state:         AdfState;
+  custom_state:  string (min_length: "0", max_length: "12");
+  driver_override: DriverOverride;
+  custom_detail: [KeyValuePair] (min_items: "0", max_items: "3");
+}
+
+// ---- root ----
+table HostVehicleData {
+  version:              InterfaceVersion;
+  timestamp:            Timestamp;
+  host_vehicle_id:      Identifier;
+  location:             BaseMoving;
+  location_rmse:        BaseMoving;
+  vehicle_basics:       VehicleBasics;
+  vehicle_powertrain:   VehiclePowertrain;
+  vehicle_brake_system: VehicleBrakeSystem;
+  vehicle_steering:     VehicleSteering;
+  vehicle_wheels:       VehicleWheels;
+  vehicle_localization: VehicleLocalization;
+  vehicle_automated_driving_function: [VehicleAutomatedDrivingFunction] (min_items: "1", max_items: "5");
+  vehicle_motion:       VehicleMotion;
+  route:                Route;
+}
+
+root_type HostVehicleData;

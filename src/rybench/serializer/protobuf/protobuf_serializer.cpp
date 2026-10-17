@@ -2,6 +2,8 @@
 #include <stdexcept>
 #include <cctype>
 #include <iostream>
+#include <algorithm>
+#include <cstring>
 
 namespace rybench::serializer {
 
@@ -375,19 +377,254 @@ void ProtobufSerializer::setProtoFieldFromFlatBuffer(google::protobuf::Message* 
 #endif // RYBENCH_ENABLE_FLATBUFFERS
 
 void ProtobufSerializer::loadSchema(const core::SchemaDefinition&) {}
-void ProtobufSerializer::initMessage() {}
-void ProtobufSerializer::addBool  (const core::SchemaField&, bool) {}
-void ProtobufSerializer::addInt   (const core::SchemaField&, int64_t) {}
-void ProtobufSerializer::addUInt  (const core::SchemaField&, uint64_t) {}
-void ProtobufSerializer::addFloat (const core::SchemaField&, float) {}
-void ProtobufSerializer::addDouble(const core::SchemaField&, double) {}
-void ProtobufSerializer::addString(const core::SchemaField&, std::string_view) {}
-void ProtobufSerializer::beginTable (const core::SchemaField&) {}
-void ProtobufSerializer::endTable   () {}
-void ProtobufSerializer::beginVector(const core::SchemaField&, size_t) {}
-void ProtobufSerializer::endVector  () {}
+
+// ── direct build: field API → protobuf wire bytes ───────────────────────────────
+//
+// The generator drives this exactly like the FlatbuffersSerializer: initMessage,
+// then addX / beginTable+endTable / beginVector(+element)+endVector, then
+// finalizeMessage. We encode the protobuf wire format directly — no intermediate
+// DynamicMessage, no reflection setters, no second serialize pass. Each message
+// frame buffers its fields in walk order and, on close, emits them in field-number
+// order (canonical) so the output matches google::protobuf byte-for-byte.
+
+namespace {
+
+using GpField = google::protobuf::FieldDescriptor;
+
+// LEB128 base-128 varint.
+inline void putVarint(std::vector<uint8_t>& b, uint64_t v) {
+    while (v >= 0x80) { b.push_back(static_cast<uint8_t>(v) | 0x80); v >>= 7; }
+    b.push_back(static_cast<uint8_t>(v));
+}
+inline void putFixed32(std::vector<uint8_t>& b, uint32_t v) {
+    for (int i = 0; i < 4; ++i) { b.push_back(static_cast<uint8_t>(v)); v >>= 8; }
+}
+inline void putFixed64(std::vector<uint8_t>& b, uint64_t v) {
+    for (int i = 0; i < 8; ++i) { b.push_back(static_cast<uint8_t>(v)); v >>= 8; }
+}
+
+// Wire type carried in the low 3 bits of a field tag.
+inline uint32_t wireTypeFor(GpField::Type t) {
+    switch (t) {
+        case GpField::TYPE_DOUBLE:                       return 1;  // 64-bit
+        case GpField::TYPE_FLOAT:                        return 5;  // 32-bit
+        case GpField::TYPE_STRING:  case GpField::TYPE_BYTES:
+        case GpField::TYPE_MESSAGE:                      return 2;  // length-delimited
+        default:                                         return 0;  // varint
+    }
+}
+inline void putTag(std::vector<uint8_t>& b, uint32_t number, uint32_t wt) {
+    putVarint(b, (static_cast<uint64_t>(number) << 3) | wt);
+}
+
+// Append the raw wire value (no tag) for an integer-ish field, casting to the
+// proto field's declared type. Only the types mapFbTypeToProtoType can emit appear.
+inline void putIntValue(std::vector<uint8_t>& b, GpField::Type t, int64_t v) {
+    switch (t) {
+        case GpField::TYPE_INT32:
+        case GpField::TYPE_ENUM:   putVarint(b, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(v)))); break;
+        case GpField::TYPE_INT64:  putVarint(b, static_cast<uint64_t>(v)); break;
+        case GpField::TYPE_UINT32: putVarint(b, static_cast<uint64_t>(static_cast<uint32_t>(v))); break;
+        case GpField::TYPE_UINT64: putVarint(b, static_cast<uint64_t>(v)); break;
+        case GpField::TYPE_BOOL:   putVarint(b, v ? 1u : 0u); break;
+        case GpField::TYPE_FLOAT:  { float  f = static_cast<float >(v); uint32_t u; std::memcpy(&u, &f, 4); putFixed32(b, u); break; }
+        case GpField::TYPE_DOUBLE: { double d = static_cast<double>(v); uint64_t u; std::memcpy(&u, &d, 8); putFixed64(b, u); break; }
+        default: break;
+    }
+}
+// Append the raw wire value for a real-valued field (addFloat/addDouble).
+inline void putRealValue(std::vector<uint8_t>& b, GpField::Type t, double v) {
+    switch (t) {
+        case GpField::TYPE_FLOAT:  { float f = static_cast<float>(v); uint32_t u; std::memcpy(&u, &f, 4); putFixed32(b, u); break; }
+        case GpField::TYPE_DOUBLE: { uint64_t u; std::memcpy(&u, &v, 8); putFixed64(b, u); break; }
+        case GpField::TYPE_INT32:
+        case GpField::TYPE_ENUM:   putVarint(b, static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(v)))); break;
+        case GpField::TYPE_INT64:  putVarint(b, static_cast<uint64_t>(static_cast<int64_t>(v))); break;
+        case GpField::TYPE_UINT32: putVarint(b, static_cast<uint64_t>(static_cast<uint32_t>(static_cast<int64_t>(v)))); break;
+        case GpField::TYPE_UINT64: putVarint(b, static_cast<uint64_t>(static_cast<int64_t>(v))); break;
+        default: break;
+    }
+}
+
+} // namespace
+
+// Emit a singular field instance (tag + value) into `fr.body`, recording it for the
+// canonical (field-number-ordered) flush on close.
+void ProtobufSerializer::emitInt(BuildFrame& fr, const GpField* fd, int64_t val) {
+    uint32_t off = static_cast<uint32_t>(fr.body.size());
+    putTag(fr.body, fd->number(), wireTypeFor(fd->type()));
+    putIntValue(fr.body, fd->type(), val);
+    fr.recs.push_back({ static_cast<uint32_t>(fd->number()), off,
+                        static_cast<uint32_t>(fr.body.size() - off) });
+}
+void ProtobufSerializer::emitReal(BuildFrame& fr, const GpField* fd, double val) {
+    uint32_t off = static_cast<uint32_t>(fr.body.size());
+    putTag(fr.body, fd->number(), wireTypeFor(fd->type()));
+    putRealValue(fr.body, fd->type(), val);
+    fr.recs.push_back({ static_cast<uint32_t>(fd->number()), off,
+                        static_cast<uint32_t>(fr.body.size() - off) });
+}
+void ProtobufSerializer::emitString(BuildFrame& fr, const GpField* fd, std::string_view val) {
+    uint32_t off = static_cast<uint32_t>(fr.body.size());
+    putTag(fr.body, fd->number(), 2);
+    putVarint(fr.body, val.size());
+    fr.body.insert(fr.body.end(), val.begin(), val.end());
+    fr.recs.push_back({ static_cast<uint32_t>(fd->number()), off,
+                        static_cast<uint32_t>(fr.body.size() - off) });
+}
+
+void ProtobufSerializer::initMessage() {
+    depth_ = 0;
+    if (!rootDescriptor_) return;
+    BuildFrame& f = pushFrame();
+    f.desc = rootDescriptor_;
+}
+
+void ProtobufSerializer::addBool(const core::SchemaField& f, bool val) {
+    addInt(f, val ? 1 : 0);
+}
+
+void ProtobufSerializer::addInt(const core::SchemaField& f, int64_t val) {
+    if (depth_ == 0) return;
+    BuildFrame& fr = top();
+    if (fr.isVector) {                                   // numeric vector element
+        if (fr.number == 0) return;
+        if (!fr.packed) putTag(fr.body, fr.number, wireTypeFor(fr.elemType));
+        putIntValue(fr.body, fr.elemType, val);
+        return;
+    }
+    if (val == 0) return;                                // proto3 singular default omitted
+    const auto* fd = fr.desc ? fr.desc->FindFieldByName(f.name) : nullptr;
+    if (fd) emitInt(fr, fd, val);
+}
+
+void ProtobufSerializer::addUInt(const core::SchemaField& f, uint64_t val) {
+    addInt(f, static_cast<int64_t>(val));   // bit-preserved; putIntValue re-casts per field type
+}
+
+void ProtobufSerializer::addFloat(const core::SchemaField& f, float val) {
+    addDouble(f, static_cast<double>(val));
+}
+
+void ProtobufSerializer::addDouble(const core::SchemaField& f, double val) {
+    if (depth_ == 0) return;
+    BuildFrame& fr = top();
+    if (fr.isVector) {                                   // real vector element
+        if (fr.number == 0) return;
+        if (!fr.packed) putTag(fr.body, fr.number, wireTypeFor(fr.elemType));
+        putRealValue(fr.body, fr.elemType, val);
+        return;
+    }
+    if (val == 0.0) return;                              // proto3 singular default omitted
+    const auto* fd = fr.desc ? fr.desc->FindFieldByName(f.name) : nullptr;
+    if (fd) emitReal(fr, fd, val);
+}
+
+void ProtobufSerializer::addString(const core::SchemaField& f, std::string_view val) {
+    if (depth_ == 0) return;
+    BuildFrame& fr = top();
+    if (fr.isVector) {                                   // string vector element (unpacked)
+        if (fr.number == 0) return;
+        putTag(fr.body, fr.number, 2);
+        putVarint(fr.body, val.size());
+        fr.body.insert(fr.body.end(), val.begin(), val.end());
+        return;
+    }
+    if (val.empty()) return;                             // proto3 singular default omitted
+    const auto* fd = fr.desc ? fr.desc->FindFieldByName(f.name) : nullptr;
+    if (fd && fd->type() == GpField::TYPE_STRING) emitString(fr, fd, val);
+}
+
+void ProtobufSerializer::beginTable(const core::SchemaField& f) {
+    const google::protobuf::Descriptor* childDesc = nullptr;
+    uint32_t number = 0;
+    if (depth_ > 0) {
+        BuildFrame& fr = top();
+        if (fr.isVector) {                               // vector-of-message element
+            childDesc = fr.elemDesc;
+            number    = fr.number;                       // wraps under the vector's field number
+        } else if (fr.desc) {
+            const auto* fd = fr.desc->FindFieldByName(f.name);
+            if (fd && fd->cpp_type() == GpField::CPPTYPE_MESSAGE) {
+                childDesc = fd->message_type();
+                number    = static_cast<uint32_t>(fd->number());
+            }
+        }
+    }
+    BuildFrame& c = pushFrame();                          // pushed even if null, to balance endTable
+    c.desc   = childDesc;
+    c.number = number;
+}
+
+void ProtobufSerializer::endTable() {
+    if (depth_ == 0) return;
+    BuildFrame& c = top();
+    // Canonical order: sort this message's fields by number, then embed the payload
+    // as a length-delimited field in the parent.
+    std::sort(c.recs.begin(), c.recs.end(),
+              [](const BuildFrame::Rec& a, const BuildFrame::Rec& b) { return a.number < b.number; });
+    uint32_t total = 0;
+    for (const auto& r : c.recs) total += r.len;
+
+    if (depth_ >= 2 && c.number != 0) {
+        BuildFrame& parent = frames_[depth_ - 2];
+        std::vector<uint8_t>& out = parent.body;
+        uint32_t off = static_cast<uint32_t>(out.size());
+        putTag(out, c.number, 2);
+        putVarint(out, total);
+        for (const auto& r : c.recs)
+            out.insert(out.end(), c.body.begin() + r.off, c.body.begin() + r.off + r.len);
+        if (!parent.isVector)                            // singular message field → a record; vector element → not
+            parent.recs.push_back({ c.number, off, static_cast<uint32_t>(out.size() - off) });
+    }
+    --depth_;
+}
+
+void ProtobufSerializer::beginVector(const core::SchemaField& f, size_t) {
+    const google::protobuf::FieldDescriptor* fd = nullptr;
+    if (depth_ > 0 && top().desc)
+        fd = top().desc->FindFieldByName(f.name);
+    BuildFrame& v = pushFrame();
+    v.isVector = true;
+    if (fd && fd->is_repeated()) {
+        v.number   = static_cast<uint32_t>(fd->number());
+        v.elemType = fd->type();
+        v.packed   = fd->is_packed();
+        if (fd->cpp_type() == GpField::CPPTYPE_MESSAGE)
+            v.elemDesc = fd->message_type();
+    }
+}
+
+void ProtobufSerializer::endVector() {
+    if (depth_ == 0) return;
+    BuildFrame& v = top();
+    if (depth_ >= 2 && v.number != 0 && !v.body.empty()) {
+        BuildFrame& parent = frames_[depth_ - 2];
+        uint32_t off = static_cast<uint32_t>(parent.body.size());
+        if (v.packed) {                                  // packed scalars: one length-delimited field
+            putTag(parent.body, v.number, 2);
+            putVarint(parent.body, v.body.size());
+        }
+        // Unpacked (string/message): v.body already holds full tag+len+payload entries.
+        parent.body.insert(parent.body.end(), v.body.begin(), v.body.end());
+        parent.recs.push_back({ v.number, off, static_cast<uint32_t>(parent.body.size() - off) });
+    }
+    --depth_;
+}
+
 core::Message ProtobufSerializer::finalizeMessage() {
-    throw std::runtime_error("ProtobufSerializer::finalizeMessage: builder API not yet implemented");
+    if (depth_ == 0) return core::Message();
+    BuildFrame& root = frames_[0];
+    std::sort(root.recs.begin(), root.recs.end(),
+              [](const BuildFrame::Rec& a, const BuildFrame::Rec& b) { return a.number < b.number; });
+    std::vector<uint8_t> out;
+    uint32_t total = 0;
+    for (const auto& r : root.recs) total += r.len;
+    out.reserve(total);
+    for (const auto& r : root.recs)
+        out.insert(out.end(), root.body.begin() + r.off, root.body.begin() + r.off + r.len);
+    depth_ = 0;
+    return core::Message(std::move(out), core::MessageFormat::Protobuf);
 }
 
 } // namespace rybench::serializer

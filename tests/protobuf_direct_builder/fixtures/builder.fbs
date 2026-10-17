@@ -1,0 +1,46 @@
+// Fixture for the direct Protobuf builder. It exercises every field kind the
+// builder must handle: scalars (bool/int/uint/long/float/double/string), an enum,
+// a nested table, a vector-of-scalar, a vector-of-string, and a vector-of-table.
+// Vector element types are limited to those the flat→proto convert path also
+// supports (int/double/string/table), so the two paths can be compared directly.
+
+attribute "min";
+attribute "max";
+attribute "min_items";
+attribute "max_items";
+attribute "min_length";
+attribute "max_length";
+
+enum Color : ubyte {
+  COLOR_RED   = 0,
+  COLOR_GREEN = 1,
+  COLOR_BLUE  = 2
+}
+
+table Inner {
+  a: int    (min: "0",     max: "100");
+  b: double (min: "-10.0", max: "10.0");
+}
+
+table Item {
+  id:    uint  (min: "0", max: "1000");
+  score: float (min: "0.0", max: "1.0");
+}
+
+table Builder {
+  flag:    bool;
+  count:   int    (min: "-50", max: "50");
+  ucount:  uint   (min: "0",   max: "5000");
+  big:     long   (min: "0",   max: "1000000");
+  ratio:   float  (min: "0.0", max: "1.0");
+  precise: double (min: "-1000.0", max: "1000.0");
+  label:   string (min_length: "3", max_length: "8");
+  color:   Color;
+  inner:   Inner;
+  ints:    [int]    (min_items: "1", max_items: "5", min: "0", max: "99");
+  reals:   [double] (min_items: "1", max_items: "4", min: "-5.0", max: "5.0");
+  names:   [string] (min_items: "1", max_items: "3", min_length: "2", max_length: "5");
+  items:   [Item]   (min_items: "1", max_items: "4");
+}
+
+root_type Builder;

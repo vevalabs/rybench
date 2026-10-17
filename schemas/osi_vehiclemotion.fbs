@@ -1,0 +1,31 @@
+namespace osi;
+
+// OSI (ASAM Open Simulation Interface) HostVehicleData.VehicleMotion, ported
+// completely from osi_hostvehicledata.proto / osi_common.proto. Every field is
+// defined (no omissions). A compact kinematic message used as the "small" perf
+// schema; osi_hostvehicledata.fbs is the "large" one from the same OSI family.
+
+attribute "min";
+attribute "max";
+
+table Vector3d {
+  x: double (min: "-1000.0", max: "1000.0");
+  y: double (min: "-1000.0", max: "1000.0");
+  z: double (min: "-100.0",  max: "100.0");
+}
+table Orientation3d {
+  roll:  double (min: "-3.14159", max: "3.14159");
+  pitch: double (min: "-3.14159", max: "3.14159");
+  yaw:   double (min: "-3.14159", max: "3.14159");
+}
+
+table VehicleMotion {
+  position:          Vector3d;
+  orientation:       Orientation3d;
+  velocity:          Vector3d;
+  orientation_rate:  Orientation3d;
+  acceleration:      Vector3d;
+  current_curvature: double (min: "-0.5", max: "0.5");
+}
+
+root_type VehicleMotion;
