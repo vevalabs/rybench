@@ -57,6 +57,11 @@ add_subdirectory(apps/rybench-filewriter)
 # Launcher (always built — no transport dependencies)
 add_subdirectory(apps/rybench-launch)
 
+# Reelay monitoring harness — only if reelay has been built (provides vendored CUDD)
+if(EXISTS ${CMAKE_SOURCE_DIR}/rv-tools/reelay/build/_deps/cudd-build/libcudd.a)
+    add_subdirectory(apps/rybench-monitor)
+endif()
+
 # Zenoh app — enabled if BUILD_ZENOH_APP=ON and zenohcxx is found
 if(BUILD_ZENOH_APP)
     find_package(zenohc   QUIET)
