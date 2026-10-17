@@ -51,6 +51,9 @@ add_subdirectory(src/rybench)
 # Tests
 add_subdirectory(tests)
 
+# Thesis example (always built — links librybench only)
+add_subdirectory(example)
+
 # Filewriter app (always built — no external dependencies)
 add_subdirectory(apps/rybench-filewriter)
 
