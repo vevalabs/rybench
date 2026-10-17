@@ -46,8 +46,11 @@ int Engine::run(transport::Publisher& publisher) {
     }
 
     const int rate = publisher.rateHz();
-    // rate <= 0 (or very high) means "unthrottled" — interval 0 skips the sleep.
-    const auto interval = std::chrono::milliseconds(rate > 0 ? 1000 / rate : 0);
+    // rate <= 0 means "unthrottled" — interval 0 skips the sleep. Use nanosecond
+    // precision so rates above 1 kHz actually throttle (integer ms gave 0 for any
+    // rate >= 1000, i.e. no throttling at all).
+    const auto interval = std::chrono::nanoseconds(
+        rate > 0 ? 1'000'000'000LL / rate : 0);
     // Stop after N generated messages; 0 = unlimited (run until Ctrl+C).
     const uint64_t maxCount = static_cast<uint64_t>(config_.getInt("generator", "count", 0));
     std::cout << "Started. Rate: " << rate << " Hz";
