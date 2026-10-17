@@ -3,6 +3,8 @@
 #include <zenoh.hxx>
 #include <iostream>
 #include <vector>
+#include <chrono>
+#include <cstring>
 
 namespace rybench::transport::zenoh {
 
@@ -24,6 +26,7 @@ std::expected<void, std::string> ZenohPublisher::init(const core::Config& config
     keyExpr_ = config.get("zenoh", "key_expr", "Benchmark/Default/Data");
     maxPayloadSize_ = static_cast<size_t>(config.getInt("zenoh", "max_payload_size", 4096));
     rateHz_ = config.getInt("zenoh", "rate_hz", 10);
+    stampTime_ = (config.get("zenoh", "stamp_time", "false") == "true");
 
     try {
         ::zenoh::Config zconfig = ::zenoh::Config::create_default();
@@ -54,7 +57,17 @@ bool ZenohPublisher::publish(const void* data, size_t size) {
 
     try {
         const uint8_t* ptr = static_cast<const uint8_t*>(data);
-        std::vector<uint8_t> buf(ptr, ptr + size);
+        std::vector<uint8_t> buf;
+        if (stampTime_) {
+            // [8-byte send ns][message] for latency measurement.
+            uint64_t ns = static_cast<uint64_t>(
+                std::chrono::steady_clock::now().time_since_epoch().count());
+            buf.resize(sizeof(ns) + size);
+            std::memcpy(buf.data(), &ns, sizeof(ns));
+            std::memcpy(buf.data() + sizeof(ns), ptr, size);
+        } else {
+            buf.assign(ptr, ptr + size);
+        }
         impl_->publisher.put(::zenoh::Bytes(std::move(buf)));
         return true;
     } catch (const std::exception& e) {

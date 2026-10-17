@@ -8,6 +8,9 @@
 #include <cstdint>
 #include <memory>
 #include <atomic>
+#include <chrono>
+
+namespace rybench::monitor { class MonitorSink; }
 
 namespace rybench::transport::zenoh {
 
@@ -27,6 +30,12 @@ private:
     std::ofstream outputFile_;
     bool initialized_ = false;
     std::atomic<uint64_t> messageCount_{0};
+
+    // Online monitor mode: feed each received message to a Reelay monitor (no file).
+    std::unique_ptr<monitor::MonitorSink> monitorSink_;
+    std::chrono::steady_clock::time_point monStart_, monLast_;
+    bool monStarted_ = false;
+    bool monLatency_ = false;   // messages carry an 8-byte send ns prefix
 
     struct Impl;
     std::unique_ptr<Impl> impl_;
