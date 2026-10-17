@@ -5,6 +5,7 @@
 build/
 build_debug/
 build_release/
+build-prof/
 
 # Third-party runtime verification tools (large, vendored externally)
 rv-tools/
@@ -26,6 +27,11 @@ benchmark/mtl/*/schema.bfbs
 
 # generated MTL traces
 benchmark/mtl/output_traces/
+
+# benchmark run outputs
+benchmark/results/
+benchmark/perf/received.json
+benchmark/perf/__pycache__/
 
 # Editor backup / temp files
 ~
