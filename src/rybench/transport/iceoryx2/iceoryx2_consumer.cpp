@@ -191,6 +191,9 @@ void Iceoryx2Consumer::shutdown() {
             outputFile_.close();
         }
         std::cout << "[Iceoryx2] Consumer shutdown. Received " << messageCount_ << " messages.\n";
+        // Wait for every fed event to resolve (a future-time MonPoly formula resolves
+        // asynchronously, well after feed() returns) before reading any stats below.
+        if (monitorSink_) monitorSink_->finish();
         if (monitorSink_ && monProc_) {
             auto s = monitorSink_->procStats();
             std::cout << "[Iceoryx2] Reelay proc latency (ns): n=" << s.n

@@ -17,20 +17,35 @@
 // Log protocol (MonPoly's own grammar, src/log_parser.mly): a timepoint's fact block
 // is only known to be complete once the FOLLOWING "@<ts>" token arrives (or EOF for
 // the very last block). So advancing to event N's facts also opens event (N+1)'s
-// header -- that header is what lets MonPoly close and evaluate event N, whose
-// verdict we then read back. The very first header (@0) is opened in the
-// constructor; the very last timepoint's verdict is flushed by closing stdin in the
-// destructor.
+// header -- that header is what lets MonPoly close and evaluate event N. The very
+// first header (@0) is opened in the constructor.
+//
+// Write/read are on SEPARATE threads, not lockstep. A PAST-only formula resolves
+// event N's verdict as soon as event (N+1)'s header arrives (delay 1); a
+// FUTURE-bounded one (e.g. EVENTUALLY[0,10]) only resolves event N once events up to
+// N+10 have been written -- writing N and then blocking to read N's verdict before
+// writing N+1 would deadlock (N's verdict can't exist until N+1..N+10 are written,
+// which can't happen until this call returns). So feed() only writes; a background
+// reader thread drains verdicts as they become available and matches each one back
+// (FIFO -- MonPoly emits them in timepoint order) to the written-at timestamp (and
+// optional publisher send-ns) recorded for that event. finish() closes stdin (EOF
+// flushes the last pending verdicts) and joins the reader so count()/trueRatio()/
+// *Stats() see everything once it returns.
 
 #include "atom_decoder.hpp"   // LatStats, computeStats, IMonitorSink
 
+#include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <deque>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include <unistd.h>
@@ -58,61 +73,39 @@ public:
                                       "(binary not found, or -sig/-formula rejected)");
         writeLine("@0");
         fflush(out_);
+        reader_ = std::thread(&MonpolySink::readerLoop, this);
     }
 
     ~MonpolySink() override {
-        if (out_) { fclose(out_); out_ = nullptr; }   // EOF -> flushes the last timepoint
-        if (in_) {
-            char buf[512];
-            while (fgets(buf, sizeof(buf), in_)) {}   // drain it so it's not lost
-            fclose(in_);
-            in_ = nullptr;
-        }
-        if (pid_ > 0) { int st; waitpid(pid_, &st, 0); }
+        finish();
+        if (pid_ > 0) { int st; waitpid(pid_, &st, 0); pid_ = -1; }
     }
 
-    // payload is already MonpolySerializer-encoded facts for this timepoint (zero or
-    // more complete "<name>()\n" lines; empty if no atom holds).
     void feed(const uint8_t* payload, uint32_t size) override {
         advance(payload, size);
-        lastVerdict_ = readVerdict();
-        if (lastVerdict_) ++trueCount_;
-        ++count_;
+        pushPending(0, 0, false);
     }
 
     uint64_t count() const override { return count_; }
     double trueRatio() const override { return count_ ? 100.0 * trueCount_ / count_ : 0.0; }
 
-    // Receive->verdict: write-facts + pipe round-trip to MonPoly and back.
     void feedTimed(const uint8_t* payload, uint32_t size) override {
-        auto t0 = std::chrono::steady_clock::now();
-        feed(payload, size);
-        auto t1 = std::chrono::steady_clock::now();
-        proc_.push_back(static_cast<uint32_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count()));
+        const uint64_t t0 = nowNs();
+        advance(payload, size);
+        pushPending(t0, 0, false);
     }
 
-    // Stage breakdown for one event, given the publisher's send ns. There is no
-    // separate decode step (the bytes are already MonPoly facts), so "parse" is ~0
-    // and "monitor" is the whole write+pipe round-trip.
     void feedBreakdown(const uint8_t* payload, uint32_t size, uint64_t sendNs) override {
-        auto t0 = std::chrono::steady_clock::now();
-        uint64_t inNs = static_cast<uint64_t>(t0.time_since_epoch().count());
-        auto t1 = t0;                                          // no decode stage
+        const uint64_t t0 = nowNs();
         advance(payload, size);
-        lastVerdict_ = readVerdict();                          // pipe round-trip
-        if (lastVerdict_) ++trueCount_;
-        auto t2 = std::chrono::steady_clock::now();
-        uint64_t verdNs = static_cast<uint64_t>(t2.time_since_epoch().count());
-        auto span = [](auto a, auto b) {
-            return static_cast<uint32_t>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(b - a).count());
-        };
-        if (inNs   >= sendNs && inNs   - sendNs < 0xffffffffULL) transp_.push_back(static_cast<uint32_t>(inNs   - sendNs));
-        parse_.push_back(span(t0, t1));
-        mon_.push_back(span(t1, t2));
-        if (verdNs >= sendNs && verdNs - sendNs < 0xffffffffULL) lat_.push_back(static_cast<uint32_t>(verdNs - sendNs));
-        ++count_;
+        pushPending(t0, sendNs, true);
+    }
+
+    // Closes stdin (EOF lets MonPoly resolve and flush every still-pending
+    // timepoint) and joins the reader thread. Idempotent.
+    void finish() override {
+        if (out_) { fclose(out_); out_ = nullptr; }
+        if (reader_.joinable()) reader_.join();
     }
 
     LatStats latencyStats() override { return computeStats(lat_); }
@@ -122,6 +115,11 @@ public:
     LatStats monStats()     override { return computeStats(mon_); }
 
 private:
+    static uint64_t nowNs() {
+        return static_cast<uint64_t>(
+            std::chrono::steady_clock::now().time_since_epoch().count());
+    }
+
     // Writes `content` into a fresh pipe and returns its READ end (the write end is
     // closed here, after writing -- content is tiny so it fits the pipe buffer
     // without blocking). The caller passes that fd to the child as "/dev/fd/<fd>",
@@ -175,17 +173,28 @@ private:
 
     // Write the event's facts (current, already-open timepoint) then open the NEXT
     // timepoint's header -- the only thing that tells MonPoly the current block is
-    // complete and triggers its verdict.
+    // complete. Write-only: does NOT wait for a verdict (see class comment).
     void advance(const uint8_t* payload, uint32_t size) {
         if (size) fwrite(payload, 1, size, out_);
-        writeLine("@" + std::to_string(count_ + 1));
+        writeLine("@" + std::to_string(writeIdx_ + 1));
         fflush(out_);
+        ++writeIdx_;
     }
 
-    // Scan lines until one of MonPoly's "... (time point N): true|false" verdict
-    // lines; skips the one-time startup banner and the per-tp "At time point N:"
-    // header line transparently (neither contains "time point ... ):").
-    bool readVerdict() {
+    struct Pending { uint64_t writeNs; uint64_t sendNs; bool hasSend; };
+
+    void pushPending(uint64_t writeNs, uint64_t sendNs, bool hasSend) {
+        std::lock_guard<std::mutex> lk(pendingMu_);
+        pending_.push_back({writeNs, sendNs, hasSend});
+    }
+
+    // Runs for the whole life of the sink: scans every line MonPoly prints, and for
+    // each "... (time point N): true|false" verdict (skipping the one-time startup
+    // banner and the per-tp "At time point N:" header line, neither of which
+    // contains "time point ... ):"), pops the oldest pending write and records it.
+    // MonPoly emits verdicts strictly in timepoint order, matching the order feed()
+    // pushed them, so FIFO popping is always the correct match.
+    void readerLoop() {
         char buf[512];
         while (fgets(buf, sizeof(buf), in_)) {
             std::string_view line(buf);
@@ -194,20 +203,50 @@ private:
             auto colon = line.find("):", tp);
             if (colon == std::string_view::npos) continue;
             auto rest = line.substr(colon + 2);
-            if (rest.find("true") != std::string_view::npos) return true;
-            if (rest.find("false") != std::string_view::npos) return false;
+            bool verdict;
+            if (rest.find("true") != std::string_view::npos) verdict = true;
+            else if (rest.find("false") != std::string_view::npos) verdict = false;
+            else continue;
+
+            const uint64_t verdNs = nowNs();
+            Pending p{0, 0, false};
+            {
+                std::lock_guard<std::mutex> lk(pendingMu_);
+                if (pending_.empty()) continue;   // shouldn't happen; be defensive
+                p = pending_.front();
+                pending_.pop_front();
+            }
+            if (verdict) ++trueCount_;
+            ++count_;
+            if (p.writeNs) {
+                proc_.push_back(nsSpan(p.writeNs, verdNs));
+                if (p.hasSend) {
+                    if (p.writeNs >= p.sendNs) transp_.push_back(nsSpan(p.sendNs, p.writeNs));
+                    mon_.push_back(nsSpan(p.writeNs, verdNs));
+                    if (verdNs >= p.sendNs) lat_.push_back(nsSpan(p.sendNs, verdNs));
+                }
+            }
         }
-        return lastVerdict_;   // pipe closed unexpectedly -- hold last known value
+        fclose(in_);
+        in_ = nullptr;
+    }
+
+    static uint32_t nsSpan(uint64_t a, uint64_t b) {
+        return static_cast<uint32_t>(std::min<uint64_t>(b - a, 0xffffffffULL));
     }
 
     int pid_ = -1;
-    FILE* out_ = nullptr;   // child's stdin
-    FILE* in_  = nullptr;   // child's stdout (+ stderr, merged)
+    FILE* out_ = nullptr;   // child's stdin (main thread only)
+    FILE* in_  = nullptr;   // child's stdout+stderr (reader thread only, after construction)
+    uint64_t writeIdx_ = 0; // next timepoint header to open (main thread only)
 
-    uint64_t count_ = 0;
-    uint64_t trueCount_ = 0;
-    bool lastVerdict_ = false;
-    std::vector<uint32_t> lat_, proc_, transp_, parse_, mon_;
+    std::thread reader_;
+    std::mutex pendingMu_;
+    std::deque<Pending> pending_;              // written, awaiting a verdict (FIFO)
+
+    std::atomic<uint64_t> count_{0};
+    std::atomic<uint64_t> trueCount_{0};
+    std::vector<uint32_t> lat_, proc_, transp_, parse_, mon_;  // reader thread only
 };
 
 }  // namespace rybench::monitor

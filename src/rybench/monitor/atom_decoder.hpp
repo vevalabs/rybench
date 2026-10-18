@@ -116,6 +116,14 @@ public:
     virtual void feedTimed(const uint8_t* payload, uint32_t size) = 0;
     virtual void feedBreakdown(const uint8_t* payload, uint32_t size, uint64_t sendNs) = 0;
 
+    // Must be called once, after the last feed*() and before reading count()/
+    // trueRatio()/*Stats(): signals "no more input" and blocks until every fed
+    // event has a verdict. A no-op for a backend that resolves synchronously inside
+    // feed() itself (MonitorSink/Reelay); required for one that can only resolve an
+    // event after seeing future events past it (MonpolySink with a future-time
+    // formula), where feed() returns before that event's verdict exists yet.
+    virtual void finish() = 0;
+
     virtual uint64_t count() const = 0;
     virtual double trueRatio() const = 0;
 

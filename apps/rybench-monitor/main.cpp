@@ -60,6 +60,7 @@ int main(int argc, char** argv) {
         sink->feed(data.data() + off, msz);
         off += msz;
     }
+    sink->finish();   // wait for every fed event to have a verdict before reading stats
     const auto dt = std::chrono::steady_clock::now() - t0;
     const double ms =
         std::chrono::duration_cast<std::chrono::nanoseconds>(dt).count() / 1e6;

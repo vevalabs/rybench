@@ -167,6 +167,9 @@ void ZenohConsumer::shutdown() {
             outputFile_.close();
         }
         std::cout << "[Zenoh] Consumer shutdown. Received " << messageCount_.load() << " messages.\n";
+        // Wait for every fed event to resolve (a future-time MonPoly formula resolves
+        // asynchronously, well after feed() returns) before reading any stats below.
+        if (monitorSink_) monitorSink_->finish();
         if (monitorSink_ && monLatency_) {
             auto s = monitorSink_->latencyStats();
             std::cout << "[Zenoh] Monitor latency (ns): n=" << s.n

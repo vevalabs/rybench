@@ -4,15 +4,23 @@
 Same setup as Table 5, but the monitor backend is MonPoly (external OCaml process,
 MFOTL) instead of Reelay (in-process, linked library). A rybench publisher
 generates + serializes + publishes an MTL trace over a transport (iceoryx2 / zenoh);
-a rybench consumer subscribes, decodes each message, and feeds it to MonpolySink,
-which keeps a persistent `monpoly -verbose` subprocess open for the whole run,
-writing one event per round-trip and reading back its true/false verdict. Latency
+a rybench consumer subscribes and feeds the already-MonPoly-encoded bytes (the wire
+serializer is "monpoly", see src/rybench/serializer/monpoly/) to MonpolySink, which
+keeps a persistent `monpoly -verbose` subprocess open for the whole run. Latency
 (ns) is publish->verdict end-to-end, via the same 8-byte steady_clock send-timestamp
 prefix used for the Reelay table (stamp_time / monitor_latency).
 
+The MFOTL formulas are the schema's own FUTURE-time "mtl:" attribute (see
+benchmark/mtl/<dir>/schema.fbs) with the outer unbounded "always[0,inf]" dropped --
+not a past-time reformulation. See _PROPDEFS below for why, and MonpolySink's own
+comment for why that forces write/read onto separate threads (resolving timepoint t
+needs facts up to t+10, so write-then-block-read-this-one's-verdict deadlocks).
+Consequence for this table: online latency now includes up to ~10 events' worth of
+real-time lookahead buffering on top of the pipe round-trip, which dominates at low
+rates (10 events * 500us at 2kHz = 5ms) and shrinks proportionally at high rates.
+
 MonPoly has no C/C++ API, so there is no Table-4-style offline/in-process variant to
-compare against here (see MonpolySink's own docstring for the log protocol and the
-mechanical reelay-DSL -> MFOTL translation of each property's past-time spec).
+compare against here.
 
     benchmark/tables/bench_table6_monpoly.py --gen all
 """
@@ -27,19 +35,32 @@ _MONPOLY_CANDIDATES = [
 ]
 MONPOLY_BIN = next((p for p in _MONPOLY_CANDIDATES if os.path.exists(p)), _MONPOLY_CANDIDATES[-1])
 
-# MFOTL translations of the same past-time specs used for Table 5's Reelay monitor
-# (historically/once/since/not/and -> PAST_ALWAYS/ONCE/SINCE/NOT/AND, "->" ->
-# IMPLIES, "[a:]" -> "[a,*)"), over the same 0-ary atoms p()/q()/r()/s(). Verified to
-# agree with Reelay's true-ratio on both MTL-generated and random traces for all
-# three properties before wiring this table (see commit message for the readings).
+# Direct MFOTL transcriptions of each schema's own FUTURE-time formula (the exact
+# "mtl:" attribute the property_guided generator is built to satisfy -- see
+# benchmark/mtl/<dir>/schema.fbs), with the outer unbounded "always[0,inf]" dropped:
+# MonPoly rejects an unbounded future operator outright ("not monitorable"), and we
+# don't need it anyway -- checking the bounded inner implication AT EVERY timepoint
+# *is* the "always", without conjoining verdicts across time. This also avoids the
+# past-time reformulation this table used earlier (historically/once/since, a
+# mechanical translation of Reelay's spec): that one is a known artifact-prone
+# rewriting (co-designed by timescales against a specific trace template, not a
+# faithful equivalent of the future formula for an arbitrary trace -- see
+# project_mtl_verification_artifact in memory) and it conjoins every verdict
+# (PAST_ALWAYS), so a single violation anywhere zeroes true% for the rest of an
+# arbitrarily long trace. Each verdict here is independent per timepoint.
+#
+# Cost: resolving timepoint t needs up to t+10's facts to have already arrived (the
+# bound), so the first ~10 events of a run never get a verdict, and online latency
+# now includes that lookahead buffering on top of the pipe round-trip -- it is NOT
+# comparable to the numbers this table reported with the past-time formulas.
 _PROPDEFS = [
     ("response_globally",  "bounded_response_globally",
-     "PAST_ALWAYS ((s() IMPLIES (ONCE[0,10] p())) AND (NOT ((NOT s()) SINCE[10,*) p())))"),
+     "p() IMPLIES (EVENTUALLY[0,10] s())"),
     ("absence_after_q",     "bounded_absence_after_q",
-     "PAST_ALWAYS ((ONCE[0,10] q()) IMPLIES ((NOT p()) SINCE q()))"),
+     "q() IMPLIES (ALWAYS[0,10] (NOT p()))"),
     ("response_between",    "bounded_response_between_q_and_r",
-     "PAST_ALWAYS ((r() AND (NOT q()) AND (ONCE q())) IMPLIES "
-     "( (((s() IMPLIES (ONCE[0,10] p())) AND (NOT ((NOT s()) SINCE[10,*) p()))) SINCE q()) ))"),
+     "(q() AND ((NOT r()) AND (EVENTUALLY[0,10] r()))) IMPLIES "
+     "(p() IMPLIES ((((NOT r()) UNTIL[0,10] s()) UNTIL[0,10] r())))"),
 ]
 PROPS = [(label, f"benchmark/mtl/{d}/schema.bfbs", formula) for label, d, formula in _PROPDEFS]
 
@@ -102,12 +123,16 @@ def run_cell(binary, section, base, bfbs, formula, count, rate, gen, dump=None):
         sub = subprocess.Popen([exe, "sub"], cwd=REPO, env=env,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         time.sleep(1.0)                                   # let the subscriber + monpoly process start
+        # Publish can be slower than rate (property_guided retries) or faster than
+        # MonPoly can drain -- scale the budget to count, with a generous floor.
+        pub_timeout = max(300, count / max(rate, 1) * 20 + 60)
         subprocess.run([exe, "pub"], cwd=REPO, env=env,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300)
-        time.sleep(2.0)                                   # let the consumer drain (monpoly is slow)
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=pub_timeout)
+        drain = max(2.0, count / 100_000)                  # MonPoly's own ceiling is ~100-150k/s
+        time.sleep(drain)                                  # let the consumer drain (monpoly is slow)
         sub.send_signal(signal.SIGINT)
         try:
-            out, _ = sub.communicate(timeout=30)
+            out, _ = sub.communicate(timeout=max(30, drain * 2))
         except subprocess.TimeoutExpired:
             sub.kill(); out, _ = sub.communicate()
     return out
@@ -149,7 +174,8 @@ def run_table(gen, args):
         return p
 
     print(f"{GEN_LABEL[gen]}")
-    hdr = f"  {'property':<22}{'transport':<11}{'recv':>8}{'p50':>10}{'p90':>10}{'p99':>10}  (ns)"
+    hdr = (f"  {'property':<22}{'transport':<11}{'recv':>8}{'dropN':>8}"
+           f"{'true%':>8}{'p50':>10}{'p90':>10}{'p99':>10}  (ns)")
     print(hdr); print("  " + "-" * (len(hdr) - 2))
     for label, bfbs, formula in PROPS:
         for tname, binary, section, base in TRANSPORTS:
@@ -158,11 +184,16 @@ def run_table(gen, args):
             dump = dump_for(bfbs)
             out = run_cell(binary, section, base, bfbs, formula, args.count, args.rate, gen, dump)
             # monitor_latency=true -> the consumer prints "Monitor latency (ns): n=<N>
-            # p50=... p90=... p99=..." on shutdown (N = latency samples received), not
-            # an "events=" line (that's only the non-latency summary).
+            # p50=... p90=... p99=... max=... mean=... true=<X>%" on shutdown (n =
+            # latency samples received = messages actually processed before SIGINT;
+            # a transport/monpoly that can't keep up with the publish rate drops the
+            # rest -- DiscardSample, no lossless mode here).
             lm = re.search(r"latency \(ns\): n=(\d+) p50=(\d+) p90=(\d+) p99=(\d+)", out)
+            tm = re.search(r"true=([\d.]+)%", out)
             recv = int(lm.group(1)) if lm else 0
-            row = f"  {label:<22}{tname:<11}{recv:>8,}"
+            dropn = args.count - recv
+            tru = float(tm.group(1)) if tm else 0.0
+            row = f"  {label:<22}{tname:<11}{recv:>8,}{dropn:>8,}{tru:>7.1f}%"
             if lm:
                 row += f"{int(lm.group(2)):>10,}{int(lm.group(3)):>10,}{int(lm.group(4)):>10,}"
             else:

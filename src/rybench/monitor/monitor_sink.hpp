@@ -74,6 +74,9 @@ public:
         ++count_;
     }
 
+    // Reelay resolves every event synchronously inside feed() -- nothing to drain.
+    void finish() override {}
+
     uint64_t count() const override { return count_; }
     double trueRatio() const override { return count_ ? 100.0 * trueCount_ / count_ : 0.0; }
 
