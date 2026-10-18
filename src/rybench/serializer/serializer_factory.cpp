@@ -8,6 +8,7 @@
 #ifdef RYBENCH_ENABLE_FLATBUFFERS
 #include "flatbuffers/flatbuffers_serializer.hpp"
 #include "null/null_serializer.hpp"
+#include "monpoly/monpoly_serializer.hpp"
 #endif
 
 namespace rybench::serializer {
@@ -36,6 +37,9 @@ std::expected<SerializerPtr, std::string> createSerializer(const core::Config& c
 #ifdef RYBENCH_ENABLE_FLATBUFFERS
         if (type == "flatbuffers") {
             return std::make_unique<FlatbuffersSerializer>(bfbsPath);
+        }
+        if (type == "monpoly") {
+            return std::make_unique<MonpolySerializer>(bfbsPath);
         }
 #endif
         return std::unexpected("Unknown or disabled serializer type: " + std::string(type));

@@ -32,6 +32,7 @@ benchmark/mtl/output_traces/
 benchmark/results/
 benchmark/perf/received.json
 benchmark/perf/__pycache__/
+benchmark/tables/__pycache__/
 
 # Editor backup / temp files
 ~

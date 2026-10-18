@@ -37,19 +37,24 @@ std::expected<void, std::string> Iceoryx2Consumer::init(const core::Config& conf
 
     const std::string serviceName = service_ + "/" + instance_ + "/" + event_;
 
-    // Online monitor mode: decode each received message and feed a monitor backend.
+    // Online monitor mode: feed each received message to a monitor backend. reelay
+    // decodes the wire bytes itself (needs monitor_format + [schema] bfbs); monpoly
+    // takes the wire bytes as-is -- they are already MonpolySerializer-encoded facts
+    // on the publish side, so no decode step and no bfbs needed here.
     if (config.get("iceoryx2", "monitor", "false") == "true") {
-        const std::string fmt     = config.get("iceoryx2", "monitor_format", "flatbuffers");
         const std::string spec    = config.get("iceoryx2", "monitor_spec", "");
-        const std::string bfbs    = config.get("schema", "bfbs", "");
         const std::string backend = config.get("iceoryx2", "monitor_backend", "reelay");
-        if (spec.empty() || bfbs.empty())
-            return std::unexpected("[Iceoryx2] monitor mode needs monitor_spec and [schema] bfbs");
+        if (spec.empty())
+            return std::unexpected("[Iceoryx2] monitor mode needs monitor_spec");
         try {
             if (backend == "monpoly") {
                 const std::string bin = config.get("iceoryx2", "monitor_monpoly_bin", "monpoly");
-                monitorSink_ = std::make_unique<monitor::MonpolySink>(fmt, bfbs, spec, bin);
+                monitorSink_ = std::make_unique<monitor::MonpolySink>(spec, bin);
             } else {
+                const std::string fmt  = config.get("iceoryx2", "monitor_format", "flatbuffers");
+                const std::string bfbs = config.get("schema", "bfbs", "");
+                if (bfbs.empty())
+                    return std::unexpected("[Iceoryx2] monitor_backend=reelay needs [schema] bfbs");
                 monitorSink_ = std::make_unique<monitor::MonitorSink>(fmt, bfbs, spec);
             }
         } catch (const std::exception& e) {
@@ -58,7 +63,7 @@ std::expected<void, std::string> Iceoryx2Consumer::init(const core::Config& conf
         }
         monLatency_ = (config.get("iceoryx2", "monitor_latency", "false") == "true");
         monProc_ = (config.get("iceoryx2", "monitor_proc", "false") == "true");
-        std::cout << "[Iceoryx2] Monitor mode: backend=" << backend << " format=" << fmt
+        std::cout << "[Iceoryx2] Monitor mode: backend=" << backend
                   << " spec=" << spec << (monLatency_ ? " (latency)" : "") << "\n";
     }
 

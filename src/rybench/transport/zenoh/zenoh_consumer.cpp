@@ -33,18 +33,23 @@ std::expected<void, std::string> ZenohConsumer::init(const core::Config& config)
     keyExpr_ = config.get("zenoh", "key_expr", "Benchmark/Default/Data");
     outputPath_ = config.get("zenoh", "output", "dump/zenoh-received.bin");
 
+    // reelay decodes the wire bytes itself (needs monitor_format + [schema] bfbs);
+    // monpoly takes the wire bytes as-is -- they are already MonpolySerializer-
+    // encoded facts on the publish side, so no decode step and no bfbs needed here.
     if (config.get("zenoh", "monitor", "false") == "true") {
-        const std::string fmt     = config.get("zenoh", "monitor_format", "flatbuffers");
         const std::string spec    = config.get("zenoh", "monitor_spec", "");
-        const std::string bfbs    = config.get("schema", "bfbs", "");
         const std::string backend = config.get("zenoh", "monitor_backend", "reelay");
-        if (spec.empty() || bfbs.empty())
-            return std::unexpected("[Zenoh] monitor mode needs monitor_spec and [schema] bfbs");
+        if (spec.empty())
+            return std::unexpected("[Zenoh] monitor mode needs monitor_spec");
         try {
             if (backend == "monpoly") {
                 const std::string bin = config.get("zenoh", "monitor_monpoly_bin", "monpoly");
-                monitorSink_ = std::make_unique<monitor::MonpolySink>(fmt, bfbs, spec, bin);
+                monitorSink_ = std::make_unique<monitor::MonpolySink>(spec, bin);
             } else {
+                const std::string fmt  = config.get("zenoh", "monitor_format", "flatbuffers");
+                const std::string bfbs = config.get("schema", "bfbs", "");
+                if (bfbs.empty())
+                    return std::unexpected("[Zenoh] monitor_backend=reelay needs [schema] bfbs");
                 monitorSink_ = std::make_unique<monitor::MonitorSink>(fmt, bfbs, spec);
             }
         } catch (const std::exception& e) {
@@ -52,7 +57,7 @@ std::expected<void, std::string> ZenohConsumer::init(const core::Config& config)
                                     + backend + "': " + e.what());
         }
         monLatency_ = (config.get("zenoh", "monitor_latency", "false") == "true");
-        std::cout << "[Zenoh] Monitor mode: backend=" << backend << " format=" << fmt
+        std::cout << "[Zenoh] Monitor mode: backend=" << backend
                   << " spec=" << spec << (monLatency_ ? " (latency)" : "") << "\n";
     }
 

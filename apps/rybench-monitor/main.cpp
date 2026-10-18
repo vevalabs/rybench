@@ -1,12 +1,15 @@
-// rybench-monitor — offline: read a size-prefixed dump, decode each message per
-// format and feed a past-time monitor (Reelay in-process, or MonPoly as an external
-// process). Measures monitoring throughput (events/s). Decode + monitor is shared
-// with the online transport consumers through the same IMonitorSink backends.
+// rybench-monitor — offline: read a size-prefixed dump and feed a past-time monitor
+// (Reelay in-process, or MonPoly as an external process). Measures monitoring
+// throughput (events/s).
 //
 //   rybench-monitor <json|flatbuffers|protobuf> <schema.bfbs> <dump> <spec> [backend] [monpoly-bin]
 //
-// backend: reelay (default, spec = reelay past-time MTL) | monpoly (spec = MFOTL
-// formula text over p()/q()/r()/s()). monpoly-bin: monpoly executable, default "monpoly".
+// backend: reelay (default) decodes each dumped message per <format> (json/
+// flatbuffers/protobuf) to p/q/r/s and feeds a reelay past-time spec. monpoly
+// (spec = MFOTL formula text over p()/q()/r()/s()) needs no decode: the dump must
+// already be MonpolySerializer-encoded bytes ([serializer] type = "monpoly" when it
+// was generated), so <format>/<schema.bfbs> are unused and accepted only to keep
+// the CLI shape uniform. monpoly-bin: monpoly executable, default "monpoly".
 
 #include "monitor_sink.hpp"
 #include "monpoly_sink.hpp"
@@ -39,7 +42,7 @@ int main(int argc, char** argv) {
 
     std::unique_ptr<rybench::monitor::IMonitorSink> sink;
     if (backend == "monpoly") {
-        sink = std::make_unique<rybench::monitor::MonpolySink>(fmt, bfbs, spec, monpolyBin);
+        sink = std::make_unique<rybench::monitor::MonpolySink>(spec, monpolyBin);
     } else if (backend == "reelay") {
         sink = std::make_unique<rybench::monitor::MonitorSink>(fmt, bfbs, spec);
     } else {

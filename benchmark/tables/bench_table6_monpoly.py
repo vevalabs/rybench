@@ -49,12 +49,10 @@ TRANSPORTS = [
     ("zenoh", "rybench-zenoh", "zenoh",
      'key_expr = "Bench/Default/Data"\n'),
 ]
-FMT = "json"   # MonpolySink decodes json|flatbuffers|protobuf alike; json keeps it simple
-
 def make_dump(bfbs, count, path):
     cfg = (f'[runtime]\napp_name = "n"\n[schema]\nbfbs = "{bfbs}"\n'
            f'[generator]\nalgorithm = "schema_guided"\nbackend = "flatbuffers"\nseed = 1\ncount = {count}\n'
-           f'[serializer]\ntype = "{FMT}"\n[filewriter]\noutput = "{path}"\nrate_hz = 0\n')
+           f'[serializer]\ntype = "monpoly"\n[filewriter]\noutput = "{path}"\nrate_hz = 0\n')
     with tempfile.TemporaryDirectory() as tmp:
         d = os.path.join(tmp, "n"); os.makedirs(d)
         open(os.path.join(d, "config.toml"), "w").write(cfg)
@@ -64,11 +62,17 @@ def make_dump(bfbs, count, path):
 
 def gen_ser(gen, count, dump=None):
     if gen == "fixed":
-        return (f'[generator]\nalgorithm = "fixed"\nseed = 1\ncount = {count}\n'
-                f'replay = "{dump}"\n[serializer]\ntype = "flatbuffers"\n')
+        # dump was created with [serializer] type = "monpoly" (make_dump), so the
+        # replayed bytes are already-encoded facts. [generator] backend tags the
+        # FixedGenerator's replayed Message with a format (default "flatbuffers" --
+        # engine.cpp always creates this serializer, regardless of algorithm); it
+        # must be "monpoly" too or the [serializer] below misreads the format tag
+        # and tries to parse the fact text as a FlatBuffer.
+        return (f'[generator]\nalgorithm = "fixed"\nbackend = "monpoly"\nseed = 1\ncount = {count}\n'
+                f'replay = "{dump}"\n[serializer]\ntype = "monpoly"\n')
     algo = "schema_guided" if gen == "random" else "property_guided"
     return (f'[generator]\nalgorithm = "{algo}"\nbackend = "flatbuffers"\n'
-            f'seed = 1\ncount = {count}\n[serializer]\ntype = "{FMT}"\n')
+            f'seed = 1\ncount = {count}\n[serializer]\ntype = "monpoly"\n')
 
 def common(bfbs, count, gen="mtl", dump=None):
     return f'[runtime]\napp_name = "n"\n[schema]\nbfbs = "{bfbs}"\n' + gen_ser(gen, count, dump)
@@ -79,9 +83,11 @@ def pub_cfg(section, base, bfbs, count, rate, gen, dump=None):
     return common(bfbs, count, gen, dump) + tport
 
 def sub_cfg(section, base, bfbs, formula):
+    # No monitor_format/bfbs needed: wire bytes are already MonpolySerializer-encoded
+    # facts, so MonpolySink feeds them straight through -- no decode on this side.
     return (common(bfbs, 0) +
             f'[{section}]\nmode = "consume"\nmax_payload_size = 4096\n'
-            f'monitor = "true"\nmonitor_format = "{FMT}"\nmonitor_backend = "monpoly"\n'
+            f'monitor = "true"\nmonitor_backend = "monpoly"\n'
             f'monitor_monpoly_bin = "{MONPOLY_BIN}"\n'
             f'monitor_spec = "{formula}"\nmonitor_latency = "true"\n{base}')
 

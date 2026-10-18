@@ -55,6 +55,7 @@ add_library(rybench STATIC
     serializer/protobuf/protobuf_serializer.cpp
     serializer/flatbuffers/flatbuffers_schema.cpp
     serializer/flatbuffers/flatbuffers_serializer.cpp
+    serializer/monpoly/monpoly_serializer.cpp
     serializer/serializer_factory.cpp
     # Transport engine (transport-agnostic publish/consume loop)
     core/engine.cpp
