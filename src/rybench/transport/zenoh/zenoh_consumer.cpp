@@ -1,5 +1,6 @@
 #include "zenoh_consumer.hpp"
 #include "monitor_sink.hpp"
+#include "monpoly_sink.hpp"
 
 #include <zenoh.hxx>
 
@@ -33,15 +34,26 @@ std::expected<void, std::string> ZenohConsumer::init(const core::Config& config)
     outputPath_ = config.get("zenoh", "output", "dump/zenoh-received.bin");
 
     if (config.get("zenoh", "monitor", "false") == "true") {
-        const std::string fmt  = config.get("zenoh", "monitor_format", "flatbuffers");
-        const std::string spec = config.get("zenoh", "monitor_spec", "");
-        const std::string bfbs = config.get("schema", "bfbs", "");
+        const std::string fmt     = config.get("zenoh", "monitor_format", "flatbuffers");
+        const std::string spec    = config.get("zenoh", "monitor_spec", "");
+        const std::string bfbs    = config.get("schema", "bfbs", "");
+        const std::string backend = config.get("zenoh", "monitor_backend", "reelay");
         if (spec.empty() || bfbs.empty())
             return std::unexpected("[Zenoh] monitor mode needs monitor_spec and [schema] bfbs");
-        monitorSink_ = std::make_unique<monitor::MonitorSink>(fmt, bfbs, spec);
+        try {
+            if (backend == "monpoly") {
+                const std::string bin = config.get("zenoh", "monitor_monpoly_bin", "monpoly");
+                monitorSink_ = std::make_unique<monitor::MonpolySink>(fmt, bfbs, spec, bin);
+            } else {
+                monitorSink_ = std::make_unique<monitor::MonitorSink>(fmt, bfbs, spec);
+            }
+        } catch (const std::exception& e) {
+            return std::unexpected(std::string("[Zenoh] Failed to start monitor backend '")
+                                    + backend + "': " + e.what());
+        }
         monLatency_ = (config.get("zenoh", "monitor_latency", "false") == "true");
-        std::cout << "[Zenoh] Monitor mode: format=" << fmt << " spec=" << spec
-                  << (monLatency_ ? " (latency)" : "") << "\n";
+        std::cout << "[Zenoh] Monitor mode: backend=" << backend << " format=" << fmt
+                  << " spec=" << spec << (monLatency_ ? " (latency)" : "") << "\n";
     }
 
     if (!monitorSink_) {

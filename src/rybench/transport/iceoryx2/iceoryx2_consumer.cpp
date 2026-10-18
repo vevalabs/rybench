@@ -1,5 +1,6 @@
 #include "iceoryx2_consumer.hpp"
 #include "monitor_sink.hpp"
+#include "monpoly_sink.hpp"
 
 #include <iox2/iceoryx2.hpp>
 #include <rybench/serializer/serializer_factory.hpp>
@@ -36,18 +37,29 @@ std::expected<void, std::string> Iceoryx2Consumer::init(const core::Config& conf
 
     const std::string serviceName = service_ + "/" + instance_ + "/" + event_;
 
-    // Online monitor mode: decode each received message and feed a Reelay monitor.
+    // Online monitor mode: decode each received message and feed a monitor backend.
     if (config.get("iceoryx2", "monitor", "false") == "true") {
-        const std::string fmt  = config.get("iceoryx2", "monitor_format", "flatbuffers");
-        const std::string spec = config.get("iceoryx2", "monitor_spec", "");
-        const std::string bfbs = config.get("schema", "bfbs", "");
+        const std::string fmt     = config.get("iceoryx2", "monitor_format", "flatbuffers");
+        const std::string spec    = config.get("iceoryx2", "monitor_spec", "");
+        const std::string bfbs    = config.get("schema", "bfbs", "");
+        const std::string backend = config.get("iceoryx2", "monitor_backend", "reelay");
         if (spec.empty() || bfbs.empty())
             return std::unexpected("[Iceoryx2] monitor mode needs monitor_spec and [schema] bfbs");
-        monitorSink_ = std::make_unique<monitor::MonitorSink>(fmt, bfbs, spec);
+        try {
+            if (backend == "monpoly") {
+                const std::string bin = config.get("iceoryx2", "monitor_monpoly_bin", "monpoly");
+                monitorSink_ = std::make_unique<monitor::MonpolySink>(fmt, bfbs, spec, bin);
+            } else {
+                monitorSink_ = std::make_unique<monitor::MonitorSink>(fmt, bfbs, spec);
+            }
+        } catch (const std::exception& e) {
+            return std::unexpected(std::string("[Iceoryx2] Failed to start monitor backend '")
+                                    + backend + "': " + e.what());
+        }
         monLatency_ = (config.get("iceoryx2", "monitor_latency", "false") == "true");
         monProc_ = (config.get("iceoryx2", "monitor_proc", "false") == "true");
-        std::cout << "[Iceoryx2] Monitor mode: format=" << fmt << " spec=" << spec
-                  << (monLatency_ ? " (latency)" : "") << "\n";
+        std::cout << "[Iceoryx2] Monitor mode: backend=" << backend << " format=" << fmt
+                  << " spec=" << spec << (monLatency_ ? " (latency)" : "") << "\n";
     }
 
     if (!monitorSink_ && writeJson_) {
