@@ -142,6 +142,16 @@ SchemaField FlatBuffersSchema::parseField(const reflection::Field* field) {
     // Parse constraints from attributes
     parseAttributes(field, sf.constraints);
 
+    // Field-role attribute (generate: "timestamp" | "counter") — resolved once
+    // here so the generator hot path never parses strings per message.
+    if (field->attributes()) {
+        if (const auto* a = field->attributes()->LookupByKey("generate")) {
+            std::string v = a->value() ? a->value()->str() : "";
+            if (v == "timestamp") sf.role = FieldRole::Timestamp;
+            else if (v == "counter") sf.role = FieldRole::Counter;
+        }
+    }
+
     return sf;
 }
 

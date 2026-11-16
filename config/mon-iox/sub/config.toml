@@ -1,0 +1,21 @@
+[runtime]
+app_name = "sub"
+[schema]
+bfbs = "benchmark/mtl/bounded_response_globally/schema.bfbs"
+[generator]
+algorithm = "property_guided"
+backend = "flatbuffers"
+seed = 1
+count = 0
+[serializer]
+type = "flatbuffers"
+[iceoryx2]
+mode = "consume"
+monitor = "true"
+monitor_format = "flatbuffers"
+monitor_spec = "historically({p} -> once[0:10] {s})"
+rate_hz = 10000000
+service = "Bench"
+instance = "Default"
+event = "Data"
+max_payload_size = 4096

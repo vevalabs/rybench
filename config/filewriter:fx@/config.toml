@@ -7,6 +7,7 @@ bfbs = "schemas/osi_sensorview.bfbs"
 [generator]
 algorithm = "fixed"
 seed = 1
+count = 0
 replay = "/tmp/rybench-fixed.dump"
 
 [serializer]
@@ -15,4 +16,3 @@ type = "flatbuffers"
 [filewriter]
 output = "/dev/null"
 rate_hz = 100000
-count = 0

@@ -1,0 +1,18 @@
+[runtime]
+app_name = "pub"
+[schema]
+bfbs = "benchmark/mtl/bounded_response_globally/schema.bfbs"
+[generator]
+algorithm = "property_guided"
+backend = "flatbuffers"
+seed = 1
+count = 500000
+[serializer]
+type = "flatbuffers"
+[iceoryx2]
+mode = "publish"
+rate_hz = 10000000
+service = "Bench"
+instance = "Default"
+event = "Data"
+max_payload_size = 4096

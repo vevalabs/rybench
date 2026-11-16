@@ -12,6 +12,8 @@ algorithm = "schema_guided"
 seed = 0
 # input file for replay (used with algorithm=fixed)
 replay = "dump/benchmark-flatbuffers.out"
+# number of messages to generate before stopping (0 = unlimited)
+count = 0
 
 [serializer]
 # type: json, protobuf, flatbuffers

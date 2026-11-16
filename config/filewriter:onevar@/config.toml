@@ -1,0 +1,13 @@
+[runtime]
+app_name = "mtl_onevar_%i"
+[schema]
+bfbs = "schemas/mtl-one-var.bfbs"
+[generator]
+algorithm = "property_guided"
+seed = 1
+count = 1000
+[serializer]
+type = "json"
+[filewriter]
+output = "/tmp/rybench-mtl-onevar.json"
+rate_hz = 1000000

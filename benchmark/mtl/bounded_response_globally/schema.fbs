@@ -1,0 +1,12 @@
+namespace benchmark;
+
+attribute "mtl";
+
+// bounded response globally — future fragment (u=100, l=0)
+table Event (mtl: "always[0,inf] (p implies eventually[0,10] s)") {
+  timestamp:ulong;
+  p:bool;
+  s:bool;
+}
+
+root_type Event;

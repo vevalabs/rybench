@@ -1,0 +1,25 @@
+namespace benchmark;
+
+// rules of schema:
+// only have Event type that includes booleans and timestamp
+// have one attribute which includes mtl formula which holds always
+// formula needed to be in correct grammer
+
+// grammer: phi | phi and phi | phi or phi | phi implies phi | not phi | (phi) | eventually[x,y] phi | always[x,y] phi
+// where x,y in the time domain integer
+// restrictions:
+//  - not only on atoms - no ambiguity in negation scope  restiction doesn't reduce expresnive power
+//  - All binary op precedence explicit via parens - no precedence rules needed
+
+// Declare the attribute key
+attribute "mtl";
+
+// Attach the MTL formula as the value of the "mtl" attribute on the root table
+table Event (mtl: "((a and c) or (eventually[0,1000] b))") {
+  timestamp:ulong;
+  a:bool;
+  b:bool;
+  c:bool;
+}
+
+root_type Event;

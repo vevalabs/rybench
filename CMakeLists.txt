@@ -35,14 +35,38 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(tomlplusplus)
 
+# Google Test
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.15.2
+)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+enable_testing()
+
 # Core library (no transport dependencies)
 add_subdirectory(src/rybench)
+
+# Tests
+add_subdirectory(tests)
+
+# Thesis example (always built — links librybench only)
+add_subdirectory(example)
 
 # Filewriter app (always built — no external dependencies)
 add_subdirectory(apps/rybench-filewriter)
 
 # Launcher (always built — no transport dependencies)
 add_subdirectory(apps/rybench-launch)
+
+# Reelay monitoring harness — only if reelay has been built (provides vendored CUDD)
+if(EXISTS ${CMAKE_SOURCE_DIR}/rv-tools/reelay/build/_deps/cudd-build/libcudd.a)
+    add_subdirectory(apps/rybench-monitor)
+endif()
+
+# MonPoly protocol stand-in (answers true instantly) -- baseline for MonpolySink overhead
+add_subdirectory(apps/monpoly-echo)
 
 # Zenoh app — enabled if BUILD_ZENOH_APP=ON and zenohcxx is found
 if(BUILD_ZENOH_APP)

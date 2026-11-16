@@ -32,9 +32,18 @@ struct FieldConstraints {
     std::optional<size_t> maxItems;
 };
 
+// Semantic generation role for a field, set from the .fbs `generate` attribute.
+// Default `None` keeps the normal random path with zero hot-path cost.
+enum class FieldRole {
+    None,        // ordinary random value within constraints
+    Timestamp,   // current wall-clock (ms since epoch) at generate() time
+    Counter,     // monotonically increasing per-field counter (0,1,2,...)
+};
+
 struct SchemaField {
     std::string      name;
     FieldType        type       = FieldType::Unknown;
+    FieldRole        role       = FieldRole::None;
     FieldConstraints constraints;
     std::vector<SchemaField> children;
 

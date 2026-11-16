@@ -45,12 +45,17 @@ add_library(rybench STATIC
     # Generator
     generator/fixed/fixed_generator.cpp
     generator/schema_guided/schema_guided_random_generator.cpp
+    generator/property_guided/mtl_node.cpp
+    generator/property_guided/mtl_parser.cpp
+    generator/property_guided/mtl_tree.cpp
+    generator/property_guided/property_guided_mtl_generator.cpp
     generator/generator_factory.cpp
     # Serializer
     serializer/json/json_serializer.cpp
     serializer/protobuf/protobuf_serializer.cpp
     serializer/flatbuffers/flatbuffers_schema.cpp
     serializer/flatbuffers/flatbuffers_serializer.cpp
+    serializer/monpoly/monpoly_serializer.cpp
     serializer/serializer_factory.cpp
     # Transport engine (transport-agnostic publish/consume loop)
     core/engine.cpp

@@ -1,0 +1,16 @@
+namespace benchmark;
+
+attribute "mtl";
+
+// User formula (future fragment, u=100):
+//   ¬(¬q ∨ r) ∨ ¬◇r  →  (◇[0,100](p ∨ r)) U r
+// Written with the parser's compound-`not`: the preprocessor pushes the
+// negations to NNF (De Morgan on the ∨, ◇/□ duality on ¬◇r) and rewrites implies.
+table Event (mtl: "( ( (not ((not q) or r)) or (not eventually[0,inf] r) ) implies ( (eventually[0,100] (p or r)) until r ) )") {
+  timestamp:ulong;
+  p:bool;
+  q:bool;
+  r:bool;
+}
+
+root_type Event;

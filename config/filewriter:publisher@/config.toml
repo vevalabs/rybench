@@ -3,5 +3,3 @@
 output = "dump/benchmark-%i.out"
 # generation/write rate in Hz
 rate_hz = 10
-# number of messages to write (0 = unlimited, run until Ctrl+C)
-count = 0

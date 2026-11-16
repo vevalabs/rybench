@@ -1,6 +1,7 @@
 #include <rybench/generator/generator_factory.hpp>
 #include "fixed/fixed_generator.hpp"
 #include "schema_guided/schema_guided_random_generator.hpp"
+#include "property_guided/property_guided_mtl_generator.hpp"
 
 #include <iostream>
 
@@ -21,6 +22,13 @@ std::expected<GeneratorPtr, std::string> createGenerator(const core::Config& con
                 std::cout << "Replay from: " << replayFile << "\n";
             }
             if (schema) gen->loadSchema(*schema);
+            return gen;
+        }
+
+        if (algorithm == "property_guided") {
+            double timeStep = 1.0;
+            auto gen = std::make_unique<PropertyGuidedMTLGenerator>(generationSerializer, timeStep, seed);
+            if (schema) gen->loadSchema(*schema);   // parses formula + sets up the backend
             return gen;
         }
 

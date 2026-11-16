@@ -13,6 +13,7 @@ SchemaGuidedRandomGenerator::SchemaGuidedRandomGenerator(serializer::Serializer&
 
 void SchemaGuidedRandomGenerator::loadSchema(const core::SchemaDefinition& schema) {
     fields_ = &schema.fields();
+    counters_.clear();
     backend_.loadSchema(schema);
 }
 
@@ -36,13 +37,13 @@ void SchemaGuidedRandomGenerator::walkFields(const std::vector<core::SchemaField
             case core::FieldType::Short:
             case core::FieldType::Int:
             case core::FieldType::Long:
-                backend_.addInt(sf, generateInt(sf.constraints, false));
+                backend_.addInt(sf, resolveInt(sf, false));
                 break;
             case core::FieldType::UByte:
             case core::FieldType::UShort:
             case core::FieldType::UInt:
             case core::FieldType::ULong:
-                backend_.addUInt(sf, static_cast<uint64_t>(generateInt(sf.constraints, true)));
+                backend_.addUInt(sf, static_cast<uint64_t>(resolveInt(sf, true)));
                 break;
             case core::FieldType::Float:
                 backend_.addFloat(sf, static_cast<float>(generateDouble(sf.constraints)));
@@ -82,6 +83,24 @@ int64_t SchemaGuidedRandomGenerator::generateEnum(const core::SchemaField& sf) {
     if (sf.enumNumericValues.empty()) return 0;
     std::uniform_int_distribution<size_t> dist(0, sf.enumNumericValues.size() - 1);
     return sf.enumNumericValues[dist(rng_)];
+}
+
+int64_t SchemaGuidedRandomGenerator::resolveInt(const core::SchemaField& sf, bool isUnsigned) {
+    // Single predicted branch for the common (None) case; no allocation, no
+    // string work. Counter/timestamp fields are the rare exception.
+    switch (sf.role) {
+        case core::FieldRole::Timestamp:
+            return static_cast<int64_t>(nowMillis());
+        case core::FieldRole::Counter:
+            return static_cast<int64_t>(counters_[&sf]++);
+        default:
+            return generateInt(sf.constraints, isUnsigned);
+    }
+}
+
+uint64_t SchemaGuidedRandomGenerator::nowMillis() {
+    return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
 int64_t SchemaGuidedRandomGenerator::generateInt(

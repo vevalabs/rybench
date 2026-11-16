@@ -2,8 +2,10 @@
 
 #include <rybench/generator/generator.hpp>
 #include <rybench/serializer/serializer.hpp>
-#include <fstream>
+#include <cstdint>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace rybench::generator {
 
@@ -20,9 +22,11 @@ public:
 private:
     serializer::Serializer& backend_;
     const core::SchemaDefinition* schema_ = nullptr;
-    std::ifstream file_;
-    bool finished_ = false;
-    core::Message lastMessage_;  // Cached for indefinite replay
+    // The whole dump is preloaded once; generate() cycles through the framed
+    // messages and returns a zero-copy view into data_ (no per-message read/alloc).
+    std::vector<uint8_t> data_;
+    std::vector<std::pair<std::size_t, std::uint32_t>> frames_;  // (offset, size) per message
+    std::size_t idx_ = 0;
 };
 
 } // namespace rybench::generator

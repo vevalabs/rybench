@@ -7,6 +7,8 @@
 #endif
 #ifdef RYBENCH_ENABLE_FLATBUFFERS
 #include "flatbuffers/flatbuffers_serializer.hpp"
+#include "null/null_serializer.hpp"
+#include "monpoly/monpoly_serializer.hpp"
 #endif
 
 namespace rybench::serializer {
@@ -16,6 +18,12 @@ std::expected<SerializerPtr, std::string> createSerializer(const core::Config& c
     try {
         std::string bfbsPath = config.get("schema", "bfbs", "");
 
+#ifdef RYBENCH_ENABLE_FLATBUFFERS
+        // No-encoding backend used to measure pure generation throughput.
+        if (type == "null") {
+            return std::make_unique<NullSerializer>(bfbsPath);
+        }
+#endif
 #ifdef RYBENCH_ENABLE_JSON
         if (type == "json") {
             return std::make_unique<JsonSerializer>(bfbsPath);
@@ -29,6 +37,9 @@ std::expected<SerializerPtr, std::string> createSerializer(const core::Config& c
 #ifdef RYBENCH_ENABLE_FLATBUFFERS
         if (type == "flatbuffers") {
             return std::make_unique<FlatbuffersSerializer>(bfbsPath);
+        }
+        if (type == "monpoly") {
+            return std::make_unique<MonpolySerializer>(bfbsPath);
         }
 #endif
         return std::unexpected("Unknown or disabled serializer type: " + std::string(type));

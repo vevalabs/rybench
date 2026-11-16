@@ -5,9 +5,13 @@
 build/
 build_debug/
 build_release/
+build-prof/
 
 # Third-party runtime verification tools (large, vendored externally)
 rv-tools/
+
+# Benchmark reference tools (cloned locally, not vendored)
+benchmark/tools/
 
 # Tool-specific files
 CLAUDE.md
@@ -19,6 +23,16 @@ dump/*.out
 
 # bfbs files
 schemas/*.bfbs
+benchmark/mtl/*/schema.bfbs
+
+# generated MTL traces
+benchmark/mtl/output_traces/
+
+# benchmark run outputs
+benchmark/results/
+benchmark/perf/received.json
+benchmark/perf/__pycache__/
+benchmark/tables/__pycache__/
 
 # Editor backup / temp files
 ~

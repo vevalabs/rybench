@@ -1,0 +1,17 @@
+[runtime]
+app_name = "mtl_recurrence_demorgan_%i"
+
+[schema]
+bfbs = "benchmark/mtl/recurrence_demorgan/schema.bfbs"
+
+[generator]
+algorithm = "property_guided"
+seed = 1
+count = 1000
+
+[serializer]
+type = "json"
+
+[filewriter]
+output = "benchmark/mtl/output_traces/recurrence_demorgan.out"
+rate_hz = 0

@@ -1,0 +1,11 @@
+namespace benchmark;
+
+attribute "mtl";
+
+// bounded absence after q — future fragment (u=100, l=0)
+table Event (mtl: "eventually[0,100] q") {
+  timestamp:ulong;
+  q:bool;
+}
+
+root_type Event;
