@@ -7,6 +7,8 @@
 #include <iostream>
 #include <thread>
 
+#include <sys/prctl.h>
+
 namespace rybench::core {
 
 Engine::Engine(const Config& config, std::atomic<bool>& running)
@@ -46,11 +48,14 @@ int Engine::run(transport::Publisher& publisher) {
     }
 
     const int rate = publisher.rateHz();
-    // rate <= 0 means "unthrottled" — interval 0 skips the sleep. Use nanosecond
-    // precision so rates above 1 kHz actually throttle (integer ms gave 0 for any
-    // rate >= 1000, i.e. no throttling at all).
+    // rate <= 0 means "unthrottled". Messages are paced against absolute deadlines
+    // (sleep_until), so per-message work does not add up and the mean rate hits the
+    // target; the default 50us timer slack is dropped to 1ns, otherwise every short
+    // sleep is stretched to ~60us (a "100 kHz" run measured ~16.5 kHz). A rate the
+    // loop cannot reach (e.g. 10 MHz in the throughput tables) never sleeps.
     const auto interval = std::chrono::nanoseconds(
         rate > 0 ? 1'000'000'000LL / rate : 0);
+    if (interval.count() > 0) prctl(PR_SET_TIMERSLACK, 1UL);
     // Stop after N generated messages; 0 = unlimited (run until Ctrl+C).
     const uint64_t maxCount = static_cast<uint64_t>(config_.getInt("generator", "count", 0));
     std::cout << "Started. Rate: " << rate << " Hz";
@@ -92,6 +97,7 @@ int Engine::run(transport::Publisher& publisher) {
         return 0;
     }
 
+    auto next = std::chrono::steady_clock::now();
     while (running_ && (maxCount == 0 || messageCount < maxCount)) {
         Message msg;
         try {
@@ -112,8 +118,14 @@ int Engine::run(transport::Publisher& publisher) {
             if (++messageCount % 1000 == 0)
                 std::cout << "Published " << messageCount << " messages\n";
         }
-        if (interval.count() > 0)
-            std::this_thread::sleep_for(interval);
+        if (interval.count() > 0) {
+            next += interval;
+            const auto now = std::chrono::steady_clock::now();
+            if (next > now)
+                std::this_thread::sleep_until(next);
+            else if (now - next > interval)
+                next = now;   // fell behind: resync rather than burst to catch up
+        }
     }
 
     std::cout << "Shutting down. Total messages: " << messageCount << "\n";

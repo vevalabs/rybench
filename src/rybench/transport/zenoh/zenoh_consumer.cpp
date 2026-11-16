@@ -44,7 +44,8 @@ std::expected<void, std::string> ZenohConsumer::init(const core::Config& config)
         try {
             if (backend == "monpoly") {
                 const std::string bin = config.get("zenoh", "monitor_monpoly_bin", "monpoly");
-                monitorSink_ = std::make_unique<monitor::MonpolySink>(spec, bin);
+                const bool spin = (config.get("zenoh", "monitor_busy_poll", "false") == "true");
+                monitorSink_ = std::make_unique<monitor::MonpolySink>(spec, bin, spin);
             } else {
                 const std::string fmt  = config.get("zenoh", "monitor_format", "flatbuffers");
                 const std::string bfbs = config.get("schema", "bfbs", "");

@@ -65,6 +65,9 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/rv-tools/reelay/build/_deps/cudd-build/libcudd.a)
     add_subdirectory(apps/rybench-monitor)
 endif()
 
+# MonPoly protocol stand-in (answers true instantly) -- baseline for MonpolySink overhead
+add_subdirectory(apps/monpoly-echo)
+
 # Zenoh app — enabled if BUILD_ZENOH_APP=ON and zenohcxx is found
 if(BUILD_ZENOH_APP)
     find_package(zenohc   QUIET)

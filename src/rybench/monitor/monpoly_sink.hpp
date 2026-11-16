@@ -20,17 +20,20 @@
 // header -- that header is what lets MonPoly close and evaluate event N. The very
 // first header (@0) is opened in the constructor.
 //
-// Write/read are on SEPARATE threads, not lockstep. A PAST-only formula resolves
-// event N's verdict as soon as event (N+1)'s header arrives (delay 1); a
-// FUTURE-bounded one (e.g. EVENTUALLY[0,10]) only resolves event N once events up to
-// N+10 have been written -- writing N and then blocking to read N's verdict before
-// writing N+1 would deadlock (N's verdict can't exist until N+1..N+10 are written,
-// which can't happen until this call returns). So feed() only writes; a background
-// reader thread drains verdicts as they become available and matches each one back
-// (FIFO -- MonPoly emits them in timepoint order) to the written-at timestamp (and
-// optional publisher send-ns) recorded for that event. finish() closes stdin (EOF
-// flushes the last pending verdicts) and joins the reader so count()/trueRatio()/
-// *Stats() see everything once it returns.
+// Write/read are on SEPARATE threads, not lockstep. A FUTURE-bounded formula (e.g.
+// EVENTUALLY[0,10]) only resolves timepoint N once blocks up to ~N+10 are closed, so
+// writing N and blocking for N's verdict would deadlock. feed() only writes; a
+// background reader thread drains MonPoly's output. finish() closes stdin (EOF
+// flushes the last pending verdicts) and joins the reader.
+//
+// Latency is measured against the TRIGGERING event, not the event the verdict is
+// about. In -verbose mode MonPoly prints "At time point K:" when block K closes,
+// then every verdict that closing resolved ("@ts. (time point N): true|false", one
+// per timepoint for a closed formula -- algorithm.ml show_results). Block K is
+// closed by feed(K) (it writes K's facts plus header K+1), so each verdict is
+// stamped against feed(K)'s write time / send-ns -- the monitor's reaction time to
+// the arrival that produced the verdict, excluding the lookahead wait. Verdicts
+// emitted after EOF have no triggering feed and are counted but not timed.
 
 #include "atom_decoder.hpp"   // LatStats, computeStats, IMonitorSink
 
@@ -40,7 +43,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <deque>
 #include <mutex>
 #include <stdexcept>
 #include <string>
@@ -48,6 +50,9 @@
 #include <thread>
 #include <vector>
 
+#include <cerrno>
+
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -56,8 +61,13 @@ namespace rybench::monitor {
 class MonpolySink : public IMonitorSink {
 public:
     // formula: MFOTL text over p()/q()/r()/s(). binPath: monpoly executable --
-    // PATH-searched if it has no '/'.
-    explicit MonpolySink(const std::string& formula, const std::string& binPath = "monpoly") {
+    // PATH-searched if it has no '/'. busyPoll: the reader thread spins on a
+    // non-blocking read instead of sleeping in the kernel between verdicts -- costs
+    // a full core, but each verdict no longer pays the wake-up of a halted CPU
+    // (measured ~10us of p90 at 100kHz, present even with only C1 allowed).
+    explicit MonpolySink(const std::string& formula, const std::string& binPath = "monpoly",
+                         bool busyPoll = false)
+        : busyPoll_(busyPoll) {
         int sigFd = pipeString("p()\nq()\nr()\ns()\n");
         int formulaFd = pipeString(formula + "\n");
         spawn(binPath, sigFd, formulaFd);
@@ -67,10 +77,11 @@ public:
         // Confirm the child is actually alive (wrong binPath / bad formula both show
         // up as an immediate EOF on our read end otherwise, which would silently look
         // like "monitor always false").
-        char banner[512];
-        if (!fgets(banner, sizeof(banner), in_))
+        std::string_view banner;
+        if (!readLine(banner))
             throw std::runtime_error("MonpolySink: '" + binPath + "' exited immediately "
                                       "(binary not found, or -sig/-formula rejected)");
+        if (busyPoll_) fcntl(inFd_, F_SETFL, fcntl(inFd_, F_GETFL) | O_NONBLOCK);
         writeLine("@0");
         fflush(out_);
         reader_ = std::thread(&MonpolySink::readerLoop, this);
@@ -81,24 +92,24 @@ public:
         if (pid_ > 0) { int st; waitpid(pid_, &st, 0); pid_ = -1; }
     }
 
+    // The record is pushed BEFORE writing, so it exists by the time the reader can
+    // see the "At time point K" line this write produces.
     void feed(const uint8_t* payload, uint32_t size) override {
+        record(0, 0, false);
         advance(payload, size);
-        pushPending(0, 0, false);
     }
 
     uint64_t count() const override { return count_; }
     double trueRatio() const override { return count_ ? 100.0 * trueCount_ / count_ : 0.0; }
 
     void feedTimed(const uint8_t* payload, uint32_t size) override {
-        const uint64_t t0 = nowNs();
+        record(nowNs(), 0, false);
         advance(payload, size);
-        pushPending(t0, 0, false);
     }
 
     void feedBreakdown(const uint8_t* payload, uint32_t size, uint64_t sendNs) override {
-        const uint64_t t0 = nowNs();
+        record(nowNs(), sendNs, true);
         advance(payload, size);
-        pushPending(t0, sendNs, true);
     }
 
     // Closes stdin (EOF lets MonPoly resolve and flush every still-pending
@@ -106,6 +117,14 @@ public:
     void finish() override {
         if (out_) { fclose(out_); out_ = nullptr; }
         if (reader_.joinable()) reader_.join();
+        if (!warned_ && (gaps_ || count_ != writeIdx_)) {
+            warned_ = true;
+            fprintf(stderr, "[MonpolySink] WARNING: %llu events fed, %llu verdicts, "
+                            "%llu timepoint gaps\n",
+                    static_cast<unsigned long long>(writeIdx_),
+                    static_cast<unsigned long long>(count_.load()),
+                    static_cast<unsigned long long>(gaps_));
+        }
     }
 
     LatStats latencyStats() override { return computeStats(lat_); }
@@ -162,8 +181,35 @@ private:
         close(inPipe[0]);
         close(outPipe[1]);
         out_ = fdopen(inPipe[1], "w");
-        in_  = fdopen(outPipe[0], "r");
-        if (!out_ || !in_) throw std::runtime_error("MonpolySink: fdopen failed");
+        inFd_ = outPipe[0];
+        if (!out_) throw std::runtime_error("MonpolySink: fdopen failed");
+    }
+
+    // Next '\n'-terminated line from MonPoly's output, as a view into rbuf_ that is
+    // valid until the next call; false at EOF. In busy-poll mode the fd is
+    // non-blocking and an empty pipe spins here instead of sleeping in read().
+    bool readLine(std::string_view& out) {
+        for (;;) {
+            const size_t nl = rbuf_.find('\n', rpos_);
+            if (nl != std::string::npos) {
+                out = std::string_view(rbuf_).substr(rpos_, nl + 1 - rpos_);
+                rpos_ = nl + 1;
+                return true;
+            }
+            if (rpos_) { rbuf_.erase(0, rpos_); rpos_ = 0; }
+            char tmp[4096];
+            const ssize_t n = read(inFd_, tmp, sizeof(tmp));
+            if (n > 0) { rbuf_.append(tmp, static_cast<size_t>(n)); continue; }
+            if (n == 0) return false;
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+#if defined(__x86_64__) || defined(__i386__)
+                __builtin_ia32_pause();
+#endif
+                continue;
+            }
+            if (errno == EINTR) continue;
+            return false;
+        }
     }
 
     void writeLine(const std::string& s) {
@@ -181,25 +227,38 @@ private:
         ++writeIdx_;
     }
 
-    struct Pending { uint64_t writeNs; uint64_t sendNs; bool hasSend; };
+    struct Rec { uint64_t writeNs; uint64_t sendNs; bool hasSend; };
 
-    void pushPending(uint64_t writeNs, uint64_t sendNs, bool hasSend) {
-        std::lock_guard<std::mutex> lk(pendingMu_);
-        pending_.push_back({writeNs, sendNs, hasSend});
+    void record(uint64_t writeNs, uint64_t sendNs, bool hasSend) {
+        std::lock_guard<std::mutex> lk(recMu_);
+        recs_.push_back({writeNs, sendNs, hasSend});   // index == writeIdx_ (timepoint)
     }
 
-    // Runs for the whole life of the sink: scans every line MonPoly prints, and for
-    // each "... (time point N): true|false" verdict (skipping the one-time startup
-    // banner and the per-tp "At time point N:" header line, neither of which
-    // contains "time point ... ):"), pops the oldest pending write and records it.
-    // MonPoly emits verdicts strictly in timepoint order, matching the order feed()
-    // pushed them, so FIFO popping is always the correct match.
+    static bool parseIndex(std::string_view s, size_t from, uint64_t& out) {
+        if (from >= s.size() || s[from] < '0' || s[from] > '9') return false;
+        out = 0;
+        while (from < s.size() && s[from] >= '0' && s[from] <= '9')
+            out = out * 10 + static_cast<uint64_t>(s[from++] - '0');
+        return true;
+    }
+
+    // "At time point K:" -> trigger = K. "@ts. (time point N): true|false" -> one
+    // verdict for timepoint N, timed against trigger K's record.
     void readerLoop() {
-        char buf[512];
-        while (fgets(buf, sizeof(buf), in_)) {
-            std::string_view line(buf);
-            auto tp = line.find("time point");
-            if (tp == std::string_view::npos) continue;
+        static constexpr std::string_view kAt = "At time point ";
+        static constexpr std::string_view kTp = "(time point ";
+        std::string_view line;
+        int64_t trigger = -1;
+        while (readLine(line)) {
+            uint64_t k;
+            if (line.substr(0, kAt.size()) == kAt) {
+                if (parseIndex(line, kAt.size(), k)) trigger = static_cast<int64_t>(k);
+                continue;
+            }
+            if (line.empty() || line[0] != '@') continue;
+            auto tp = line.find(kTp);
+            uint64_t n;
+            if (tp == std::string_view::npos || !parseIndex(line, tp + kTp.size(), n)) continue;
             auto colon = line.find("):", tp);
             if (colon == std::string_view::npos) continue;
             auto rest = line.substr(colon + 2);
@@ -209,26 +268,33 @@ private:
             else continue;
 
             const uint64_t verdNs = nowNs();
-            Pending p{0, 0, false};
+            Rec r{0, 0, false};
+            bool timed = false;
             {
-                std::lock_guard<std::mutex> lk(pendingMu_);
-                if (pending_.empty()) continue;   // shouldn't happen; be defensive
-                p = pending_.front();
-                pending_.pop_front();
-            }
-            if (verdict) ++trueCount_;
-            ++count_;
-            if (p.writeNs) {
-                proc_.push_back(nsSpan(p.writeNs, verdNs));
-                if (p.hasSend) {
-                    if (p.writeNs >= p.sendNs) transp_.push_back(nsSpan(p.sendNs, p.writeNs));
-                    mon_.push_back(nsSpan(p.writeNs, verdNs));
-                    if (verdNs >= p.sendNs) lat_.push_back(nsSpan(p.sendNs, verdNs));
+                std::lock_guard<std::mutex> lk(recMu_);
+                // The header feed() always pre-opens leaves one empty trailing block
+                // that EOF closes; it is no real event, so its verdict is dropped.
+                if (n >= recs_.size()) continue;
+                if (trigger >= 0 && static_cast<size_t>(trigger) < recs_.size()) {
+                    r = recs_[static_cast<size_t>(trigger)];
+                    timed = true;
                 }
             }
+            if (n != nextTp_) ++gaps_;
+            nextTp_ = n + 1;
+            if (verdict) ++trueCount_;
+            ++count_;
+            if (!timed) continue;
+            if (!r.writeNs) continue;
+            proc_.push_back(nsSpan(r.writeNs, verdNs));          // trigger write -> verdict
+            if (r.hasSend) {
+                if (r.writeNs >= r.sendNs) transp_.push_back(nsSpan(r.sendNs, r.writeNs));
+                mon_.push_back(nsSpan(r.writeNs, verdNs));
+                if (verdNs >= r.sendNs) lat_.push_back(nsSpan(r.sendNs, verdNs));
+            }
         }
-        fclose(in_);
-        in_ = nullptr;
+        close(inFd_);
+        inFd_ = -1;
     }
 
     static uint32_t nsSpan(uint64_t a, uint64_t b) {
@@ -237,15 +303,21 @@ private:
 
     int pid_ = -1;
     FILE* out_ = nullptr;   // child's stdin (main thread only)
-    FILE* in_  = nullptr;   // child's stdout+stderr (reader thread only, after construction)
+    int   inFd_ = -1;       // child's stdout+stderr (reader thread only, after construction)
+    std::string rbuf_;      // readLine buffer (reader thread only, after construction)
+    size_t rpos_ = 0;
+    bool busyPoll_ = false;
     uint64_t writeIdx_ = 0; // next timepoint header to open (main thread only)
 
     std::thread reader_;
-    std::mutex pendingMu_;
-    std::deque<Pending> pending_;              // written, awaiting a verdict (FIFO)
+    std::mutex recMu_;
+    std::vector<Rec> recs_;                    // per fed timepoint (main pushes, reader reads)
 
     std::atomic<uint64_t> count_{0};
     std::atomic<uint64_t> trueCount_{0};
+    uint64_t nextTp_ = 0;                      // reader thread only
+    uint64_t gaps_ = 0;                        // verdicts whose timepoint skipped ahead
+    bool warned_ = false;
     std::vector<uint32_t> lat_, proc_, transp_, parse_, mon_;  // reader thread only
 };
 
