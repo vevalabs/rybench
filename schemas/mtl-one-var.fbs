@@ -1,0 +1,15 @@
+namespace benchmark;
+
+// One-variable MTL example: single boolean atom p + timestamp.
+// The formula lives on the root table's "mtl" attribute (same grammar as
+// mtl-example.fbs: always[a,b] / eventually[a,b] / until[a,b], and/or/implies,
+// not only on atoms, binary ops parenthesised).
+
+attribute "mtl";
+
+table Event (mtl: "always[0,45] (((not p) until[0,4] p))") {
+  timestamp:ulong;
+  p:bool;
+}
+
+root_type Event;
